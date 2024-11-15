@@ -1,3 +1,4 @@
 casadi
 liecasadi
 pydantic
+matplotlib
