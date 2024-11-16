@@ -48,7 +48,7 @@ class Optimizer:
         # Constrain timestep size using h = T / num_steps
         self.solver.subject_to(self.h == self.T / self.config.num_steps)
 
-        self.solver.subject_to(self.T > 0)
+        self.solver.subject_to(self.T > 0.5)
         self.solver.subject_to(self.T < self.config.max_time)
 
         self.solver.set_initial(self.T, 1.0)  # Initial guess for T
@@ -59,12 +59,19 @@ class Optimizer:
         Solves the OCP and calls animate_solution to visualize the solution.
         """
         # Solve the optimization problem
-        p_opts = {"expand": True}
-        s_opts = {
-            "max_iter": 3000,
-            # "print_level": 0,      # Suppress IPOPT output
+        
+        plugin_opts = {
+            "expand": True
         }
-        self.solver.solver("ipopt", p_opts, s_opts)
+        solver_options = {
+            "derivative_test": "none",  # Disable derivative checker
+            "max_iter": 10000,           # Increase iteration limit
+            "tol": 1e-10,                # Set convergence tolerance
+            "mu_strategy": "adaptive",  # Dynamic barrier parameter adjustment
+            "nlp_scaling_method": "gradient-based",  # Enable scaling
+            "print_level": self.config.ipopt_print_level
+        }
+        self.solver.solver("ipopt", plugin_opts, solver_options)
 
         try:
             # Solve the problem
@@ -74,12 +81,10 @@ class Optimizer:
         except Exception as e:
             print("Solver failed:", e)
             return None
-
+        
         # Print the trajectory time
         print("Trajectory time:", self.solution.value(self.T))
         print("Timestep size:", self.solution.value(self.h))
 
         # Animate the solution
         animate_solution(self, self.solution)
-            
-    

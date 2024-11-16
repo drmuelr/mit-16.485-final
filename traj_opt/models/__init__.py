@@ -1,6 +1,6 @@
-from traj_opt.models.hopping_softfly import HoppingSoftfly
-from traj_opt.models.terrain import FlatTerrain
-from traj_opt.models.softfly import Softfly
+from traj_opt.models.hopping_softfly.model import HoppingSoftfly
+from traj_opt.models.terrain.flat_preset import FlatTerrain
+from traj_opt.models.softfly.model import Softfly
 
 __all__ = [
     "HoppingSoftfly",

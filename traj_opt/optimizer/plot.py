@@ -6,11 +6,12 @@ from scipy.spatial.transform import Rotation as R
 
 def animate_solution(optimizer, solution):
     """
-    Animates the position and orientation of the robot as it follows the optimal trajectory.
+    Animates the position and orientation of the robot as it follows the optimal trajectory,
+    and plots a plane at z=0.
     """
     # Extract the solution
-    positions = [solution.value(optimizer.robot_model.body_position[k]) for k in range(optimizer.config.num_steps + 1)]
-    quaternions = [solution.value(optimizer.robot_model.body_quat[k]) for k in range(optimizer.config.num_steps + 1)]
+    positions = [solution.value(optimizer.robot_model.position_world[k]) for k in range(optimizer.config.num_steps + 1)]
+    quaternions = [solution.value(optimizer.robot_model.q_body_to_world[k]) for k in range(optimizer.config.num_steps + 1)]
 
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
@@ -31,6 +32,13 @@ def animate_solution(optimizer, solution):
     ax.set_xlim([pos_array[:, 0].min() - 1, pos_array[:, 0].max() + 1])
     ax.set_ylim([pos_array[:, 1].min() - 1, pos_array[:, 1].max() + 1])
     ax.set_zlim([pos_array[:, 2].min() - 1, pos_array[:, 2].max() + 1])
+
+    # Plot a plane at z=0
+    x_plane = np.linspace(pos_array[:, 0].min() - 1, pos_array[:, 0].max() + 1, 10)
+    y_plane = np.linspace(pos_array[:, 1].min() - 1, pos_array[:, 1].max() + 1, 10)
+    X, Y = np.meshgrid(x_plane, y_plane)
+    Z = np.zeros_like(X)  # Plane at z=0
+    ax.plot_surface(X, Y, Z, color="gray", alpha=0.5, rstride=100, cstride=100)
 
     # Function to update coordinate frame and position
     def update_frame(i):
@@ -61,40 +69,41 @@ def animate_solution(optimizer, solution):
     ani.save("latest_trajectory.gif", writer=writergif)
     plt.show()
 
-    # # Plot the spring elongation over time
-    # spring_elongation = [solution.value(optimizer.robot_model.spring_elongation[k]) for k in range(optimizer.config.num_steps + 1)]
-    # plt.plot(spring_elongation)
+    # # Plot the control forces over time
+    # control_forces = [solution.value(optimizer.robot_model.control_force[k]) for k in range(optimizer.config.num_steps)]
+    # control_forces = np.array(control_forces)
+    # plt.plot(control_forces - 9.81)
     # plt.xlabel("Time")
-    # plt.ylabel("Spring Elongation")
-    # plt.title("Spring Elongation vs Time")
+    # plt.ylabel("Control Force")
+    # plt.title("Control Force vs Time")
+    # plt.legend(["Force"])
     # plt.show()
 
-    # Plot the control forces over time
-    control_forces = [solution.value(optimizer.robot_model.control_forces[k]) for k in range(optimizer.config.num_steps)]
-    control_forces = np.array(control_forces)
-    plt.plot(control_forces)
-    plt.xlabel("Time")
-    plt.ylabel("Control Forces")
-    plt.title("Control Forces vs Time")
-    plt.legend(["Force 1", "Force 2", "Force 3", "Force 4"])
-    plt.show()
-
-    # # Plot the contact forces over time
-    # contact_forces = [solution.value(optimizer.robot_model.contact_force[k]) for k in range(optimizer.config.num_steps + 1)]
-    # contact_forces = np.array(contact_forces)
-    # plt.plot(contact_forces)
+    # # Plot the position over time
+    # position = [solution.value(optimizer.robot_model.position_world[k]) for k in range(optimizer.config.num_steps)]
+    # position = np.array(position)
+    # plt.plot(position)
     # plt.xlabel("Time")
-    # plt.ylabel("Contact Forces")
-    # plt.title("Contact Forces vs Time")
-    # plt.legend(["Force X", "Force Y", "Force Z"])
+    # plt.ylabel("Position")
+    # plt.title("Position vs Time")
+    # plt.legend(["X", "Y", "Z"])
     # plt.show()
 
-    # Plot the contact location over time
-    contact_points = [solution.value(optimizer.robot_model.body_position[k]) for k in range(optimizer.config.num_steps + 1)]
-    contact_points = np.array(contact_points)
-    plt.plot(contact_points)
+    # # Plot the velocity over time
+    # velocity = [solution.value(optimizer.robot_model.velocity_world[k]) for k in range(optimizer.config.num_steps)]
+    # velocity = np.array(velocity)
+    # plt.plot(velocity)
+    # plt.xlabel("Time")
+    # plt.ylabel("Velocity")
+    # plt.title("Velocity vs Time")
+    # plt.legend(["X", "Y", "Z"])
+    # plt.show()
+
+    # Plot the sdf of the contact points over time
+    sdf = [solution.value(optimizer.robot_model.sdf_value[k]) for k in range(optimizer.config.num_steps)]
+    sdf = np.array(sdf)
+    plt.plot(sdf)
     plt.xlabel("Time")
-    plt.ylabel("Contact Location")
-    plt.title("Contact Location vs Time")
-    plt.legend(["X", "Y", "Z"])
+    plt.ylabel("SDF")
     plt.show()
+    
