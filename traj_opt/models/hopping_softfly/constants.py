@@ -1,18 +1,13 @@
 import casadi as ca
 
-NUM_CONTACT_POINTS = 1
+ORIGINAL_SPRING_LENGTH_M = 0.2
 """
-Number of contact points on the robot (just the bottom of the spring).
-"""
-
-SPRING_CONSTANT_N_M = 1.0
-"""
-Spring constant for the spring in the robot [N/m].
+The length of the spring when it is at rest [m].
 """
 
-SPRING_LENGTH_M = 1.0
+SPRING_CONSTANT_N_M = 1000
 """
-Length of the spring when undeformed [m].
+The spring constant of the spring [N/m].
 """
 
 GRAVITY_M_S2 = 9.81
@@ -30,12 +25,22 @@ ARM_LENGTH_M = 1.0
 Length of arm connecting the body to each wing [m].
 """
 
+MAX_THRUST_N = 30.0
+"""
+Maximum vertical thrust that can be applied by the wings [N].
+"""
 
-IX = 0.1  # Example inertia around x-axis, adjust based on your model
-IY = 0.2  # Example inertia around y-axis, adjust based on your model
-IZ = 0.3  # Example inertia around z-axis, adjust based on your model
+MAX_TORQUE_XY_N_M = 10.0
+"""
+Maximum X/Y torque that can be applied by the wings [N*m].
+"""
 
-I = ca.diag(ca.vertcat(IX, IY, IZ))
+MAX_TORQUE_Z_N_M = 5.0
+"""
+Maximum Z torque that can be applied by the wings [N*m].
+"""
+
+I = ca.diag(ca.vertcat(0.1, 0.1, 0.1))
 """
 Inertial tensor for the body [kg*m^2].
 """

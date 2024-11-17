@@ -64,11 +64,16 @@ class Optimizer:
             "expand": True
         }
         solver_options = {
-            "derivative_test": "none",  # Disable derivative checker
-            "max_iter": 10000,           # Increase iteration limit
-            "tol": 1e-10,                # Set convergence tolerance
-            "mu_strategy": "adaptive",  # Dynamic barrier parameter adjustment
-            "nlp_scaling_method": "gradient-based",  # Enable scaling
+            "tol": 1e-6,
+            "acceptable_tol": 1e-4,
+            "max_iter": 100000,
+            "mu_strategy": "adaptive",
+            "nlp_scaling_method": "gradient-based",
+            "nlp_scaling_max_gradient": 100,
+            "hessian_approximation": "limited-memory",
+            "jacobian_approximation": "finite-difference-values",
+            "max_soc": 4,
+            "derivative_test": "none",  # Enable for debugging
             "print_level": self.config.ipopt_print_level
         }
         self.solver.solver("ipopt", plugin_opts, solver_options)
@@ -79,6 +84,7 @@ class Optimizer:
             print("Solver successful!")
 
         except Exception as e:
+            self.solver.debug.show_infeasibilities()
             print("Solver failed:", e)
             return None
         
@@ -88,3 +94,14 @@ class Optimizer:
 
         # Animate the solution
         animate_solution(self, self.solution)
+
+    def loose_equals_constraint(self, a, b, tolerance=1e-8):
+        """
+        Creates a constraint that forces two values to be approximately equal.
+        """
+        self.solver.subject_to(
+            a - b <= tolerance
+        )
+        self.solver.subject_to(
+            b - a <= tolerance
+        )

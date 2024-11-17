@@ -1,10 +1,5 @@
 import casadi as ca
 
-NUM_CONTACT_PTS = 4
-"""
-One contact point at the end of each arm.
-"""
-
 GRAVITY_M_S2 = 9.81
 """
 Acceleration due to Earth's gravity [m/s^2].

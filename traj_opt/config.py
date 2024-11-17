@@ -43,7 +43,7 @@ class TrajOptConfig(BaseModel):
         "velocity": [0.0, 0.0, 0.0],
         "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
         "angular_velocity_body": [0.0, 0.0, 0.0],
-        "control_force": 0.0, # Along the body z-axis
+        "control_force": 9.81, # Along the body z-axis
         "control_moment": [0.0, 0.0, 0.0] # In body frame
     }
     """
@@ -88,7 +88,7 @@ class TrajOptConfig(BaseModel):
     The maximum time allowed to reach the final position from the initial position.
     """
 
-    ipopt_print_level: int = 1
+    ipopt_print_level: int = 5
     """
     The verbosity level of IPOPT solver output.
 

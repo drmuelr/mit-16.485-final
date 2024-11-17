@@ -6,7 +6,9 @@ from traj_opt.models.hopping_softfly.constants import *
 
 
 class HoppingSoftfly:
+
     def __init__(self, optimizer, terrain: TerrainBase):
+
         # Store the optimizer
         self.optimizer = optimizer
         self.N = optimizer.config.num_steps
@@ -15,198 +17,383 @@ class HoppingSoftfly:
         # Store the terrain
         self.terrain = terrain
 
-        # Setup the dynamics
-        self.setup_dynamics()
+        # Setup the optimization variables
+        self.setup_variables()
+
+        # Setup actuator dynamics
+        self.setup_actuators()
+
+        # Setup spring dynamics
+        self.setup_spring_dynamics()
 
         # Setup the contact constraints
         self.setup_contact_constraints()
 
-        # Define the cost function
-        self.setup_cost()
+        # Setup the rigid body dynamics
+        self.setup_rigid_body_dynamics()
 
-        # Define the initial and final conditions
+        # Setup initial and final conditions
         self.setup_initial_and_final_conditions()
 
-    def setup_cost(self):
-        cost = 0
-        for k in range(self.optimizer.config.num_steps):
-            # Minimize the sum of the squares of the control input
-            cost += (
-                ca.sumsqr(self.optimizer.T)
-                + 0.01*ca.sumsqr(self.control_forces[k])
+        # Setup the cost function
+        self.setup_cost()
+    
+    def setup_variables(self):
+        """
+        Setup all variables for the optimization problem.
+        """
+        # State variables (q)
+        self.position_world  = [self.optimizer.solver.variable(3) for _ in range(self.N + 1)]
+        self.q_body_to_world = [self.optimizer.solver.variable(4) for _ in range(self.N + 1)]
+        self.spring_elongation = [self.optimizer.solver.variable() for _ in range(self.N + 1)]
+
+        # Derivatives of the state variables (qdot)
+        self.velocity_world        = [self.optimizer.solver.variable(3) for _ in range(self.N + 1)]
+        self.angular_velocity_body = [self.optimizer.solver.variable(3) for _ in range(self.N + 1)]
+
+        # Control force + moment (wrench)
+        self.control_thrust = [self.optimizer.solver.variable() for _ in range(self.N)]
+        self.control_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+        self.control_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+
+        # Contact forces and moments
+        self.contact_force_z     = [self.optimizer.solver.variable()  for _ in range(self.N)]
+        self.contact_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+        self.contact_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+
+        # Spring force
+        self.spring_force = [self.optimizer.solver.variable() for _ in range(self.N)]
+        self.spring_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+
+        # Surface normal at contact point
+        self.cos_theta      = [self.optimizer.solver.variable() for _ in range(self.N+1)]
+        self.surface_normal = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+        self.sdf_value      = [self.optimizer.solver.variable(2) for _ in range(self.N+1)]
+
+        # Contact point locations in world frame
+        self.contact_point_location = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+
+        # Velocity of contact point location in world frame
+        # Used to fake friction (TODO: Remove and replace with full friction
+        # model)
+        self.contact_point_velocity = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+        
+        # Gravity force = m*g
+        self.gravity = ca.vertcat(0, 0, -BODY_MASS_KG*GRAVITY_M_S2)
+
+        # Total force acting on body w.r.t. world frame
+        self.total_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+
+        # Total moment acting on body w.r.t. body frame
+        self.total_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+    
+    def setup_spring_dynamics(self):
+        """
+        Setup the spring dynamics for the optimization problem.
+
+        Solves for the spring force in terms of the elongation.
+        """
+        for k in range(self.N+1):
+            R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
+
+            # Spring is compressed when contacting and otherwise has no elongation
+            self.optimizer.solver.subject_to(
+                self.cos_theta[k] ==
+                ca.dot(self.surface_normal[k], R_body_to_world @ ca.vertcat(0, 0, 1)),
+            )
+            self.optimizer.loose_equals_constraint(
+                self.spring_elongation[k],
+                ca.fmin(
+                    0, 
+                    (self.position_world[k][2] / (self.cos_theta[k] + 1e-6)) - ORIGINAL_SPRING_LENGTH_M
+                    # Add small value to prevent division by zero
+                )
             )
 
-        self.optimizer.solver.minimize(cost)
-    
-    def setup_initial_and_final_conditions(self):
-        # Initial state constraints
-        self.optimizer.solver.subject_to(
-            self.body_position[0] == ca.vertcat(*self.optimizer.config.initial_position)
-        )
-        self.optimizer.solver.subject_to(
-                self.body_quat[0] == lca.SO3.Identity().as_quat()
-        )
-        self.optimizer.solver.subject_to(
-            self.body_velocity[0] == ca.vertcat(*[0.0, 0.0, 0.0])
-        )
-        self.optimizer.solver.subject_to(
-            self.body_angular_velocity[0] == ca.vertcat(*[0.0, 0.0, 0.0])
-        )
-        self.optimizer.solver.subject_to(
-            self.spring_elongation[0] == 0
-        )
-        self.optimizer.solver.subject_to(
-            self.spring_velocity[0] == 0
-        )
+        for k in range(self.N):
+            R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
 
-        # Final state constraints
-        self.optimizer.solver.subject_to(
-            self.body_position[self.N] == ca.vertcat(*self.optimizer.config.final_position)
-        )
-        self.optimizer.solver.subject_to(
-            self.body_quat[self.N] == lca.SO3.Identity().as_quat()
-        )
-        # self.optimizer.solver.subject_to(
-        #     self.body_velocity[self.N] == ca.vertcat(*[0.0, 0.0, 0.0])
-        # )
-        self.optimizer.solver.subject_to(
-            self.body_angular_velocity[self.N] == ca.vertcat(*[0.0, 0.0, 0.0])
-        )
+            # Compute the spring force
+            self.spring_force[k] = - SPRING_CONSTANT_N_M * self.spring_elongation[k]
+            self.optimizer.loose_equals_constraint(
+                self.spring_force_world[k],
+                R_body_to_world @ ca.vertcat(0, 0, self.spring_force[k])
+            )
+                
+    
+    def setup_actuators(self):
+        """
+        Set up the actuator dynamics and constraints for the optimization problem.
+
+        Constraints are defined in constants.py.
+        """
+        for k in range(self.N):
+            # Control force w.r.t. world frame
+            R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
+            self.optimizer.loose_equals_constraint(
+                self.control_force_world[k],
+                R_body_to_world @ ca.vertcat(0, 0, self.control_thrust[k])
+            )
+
+            # Thrust limits
+            self.optimizer.solver.subject_to(
+                self.control_thrust[k] <= MAX_THRUST_N
+            )
+            self.optimizer.solver.subject_to(
+                self.control_thrust[k] >= 0
+            )
+        
+            # Torque limits
+            self.optimizer.solver.subject_to(
+                self.control_moment_body[k][0] <= MAX_TORQUE_XY_N_M
+            )
+            self.optimizer.solver.subject_to(
+                self.control_moment_body[k][0] >= -MAX_TORQUE_XY_N_M
+            )
+            self.optimizer.solver.subject_to(
+                self.control_moment_body[k][1] <= MAX_TORQUE_XY_N_M
+            )
+            self.optimizer.solver.subject_to(
+                self.control_moment_body[k][1] >= -MAX_TORQUE_XY_N_M
+            )
+            self.optimizer.loose_equals_constraint(
+                self.control_moment_body[k][2], 0.0
+            )
 
     def setup_contact_constraints(self):
-        for k in range(self.N):
+        """
+        Sets up the contact constraints for the optimization problem:
+            1. Non-penetration constraint
+            2. Contact force always positive
+            3. Complimentary constraint
+        """
+        for k in range(self.N+1):
+            # Contact point location
+            # p_contact = p_drone - R_b^w @ [0, 0, l + d]
+            R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
+
+            self.optimizer.solver.subject_to(
+                self.contact_point_location[k] == 
+                self.position_world[k] + 
+                R_body_to_world @ ca.vertcat (
+                    0, 0, -ORIGINAL_SPRING_LENGTH_M - self.spring_elongation[k]
+                )
+            )
+
+            # Surface normal at contact point
+            self.optimizer.solver.subject_to(
+                self.surface_normal[k] ==
+                self.terrain.normal_vector(self.contact_point_location[k])
+            )
+
+            # Signed distance function value
+            self.optimizer.solver.subject_to(
+                self.sdf_value[k] == 
+                self.terrain.sdf(self.contact_point_location[k])
+            )
+
             # Non-penetration constraint
             self.optimizer.solver.subject_to(
-                self.terrain.sdf(self.contact_point_location[k]) >= 0
+                self.sdf_value[k] >= 0
+            )
+
+        
+        for k in range(self.N):
+            # Integrate contact point velocity
+            # TODO: Remove this and replace with full friction model
+            self.optimizer.loose_equals_constraint(
+                (self.contact_point_location[k+1] - self.contact_point_location[k]),
+                self.dt * self.contact_point_velocity[k]
+            )
+
+            # Contact force in world frame
+            self.optimizer.loose_equals_constraint(
+                self.contact_force_world[k],
+                self.surface_normal[k] * self.contact_force_z[k]
+            )
+
+            # Contact moment in body frame
+            R_world_to_body = lca.SO3(self.q_body_to_world[k]).inverse().as_matrix()
+            moment_arm = (self.contact_point_location[k] - self.position_world[k])
+            self.optimizer.loose_equals_constraint(
+                self.contact_moment_body[k],
+                R_world_to_body @ ca.cross(moment_arm, self.contact_force_world[k])
+            )
+
+            # Complimentary constraint on contact force
+            # Contact force is only nonzero during contact
+            self.optimizer.loose_equals_constraint(
+                self.contact_force_z[k] * self.terrain.sdf(self.contact_point_location[k]),
+                0
             )
 
             # Contact force is positive
             self.optimizer.solver.subject_to(
-                self.contact_force[k] >= 0
+                self.contact_force_z[k] >= 0
             )
 
-            # Complimentary constraint
-            self.optimizer.solver.subject_to(
-                self.terrain.normal_vector(self.contact_point_location[k]) @ self.contact_force[k] == 0
+            # Complimentary constraint on zero velocity of contact point
+            self.optimizer.loose_equals_constraint(
+                self.contact_point_velocity[k] * self.contact_force_z[k],
+                0
             )
+    
+    def setup_rigid_body_dynamics(self):
+        """
+        Set up the rigid body dynamics for the optimization problem.
 
+        Integrates:
+            - velocity -> position
+            
+            - angular velocity -> orientation
 
-    def setup_dynamics(self):
-        # Define the state variables (q)
-        self.body_position     = [self.optimizer.solver.variable(3, 1) for _ in range(self.N + 1)]
-        self.body_quat         = [self.optimizer.solver.variable(4, 1) for _ in range(self.N + 1)]
-        self.spring_elongation = [self.optimizer.solver.variable(1)    for _ in range(self.N + 1)]
+            - total force -> velocity
+                - total force consists of control force, gravity, and contact force
 
+            - total moment -> angular velocity
+                - total moment consists of control moment and contact moment
+        """
         for k in range(self.N):
-            # Spring cannot deform more than its length
+            # Integrate velocity to get position
             self.optimizer.solver.subject_to(
-                self.spring_elongation[k] >= -SPRING_LENGTH_M
+                (self.position_world[k+1] - self.position_world[k]) ==
+                self.dt * self.velocity_world[k]
             )
+        
+            # Integrate angular velocity to get orientation
+            # Leverage Lie Group properties to optimize on SO(3) manifold
+            vector_SO3 = lca.SO3Tangent(self.angular_velocity_body[k] * self.dt)
+            rotation_SO3 = lca.SO3(self.q_body_to_world[k])
             self.optimizer.solver.subject_to(
-                self.spring_elongation[k] <= SPRING_LENGTH_M
-            )
-
-        # Define derivatives of the state variables (qdot)
-        self.body_velocity         = [self.optimizer.solver.variable(3, 1) for _ in range(self.N + 1)]
-        self.body_angular_velocity = [self.optimizer.solver.variable(3, 1) for _ in range(self.N + 1)]
-        self.spring_velocity       = [self.optimizer.solver.variable(1)    for _ in range(self.N + 1)]
-
-        # qk - qk+1 + h*qdotk+1 = 0 (eq 7a from Posa, Cantu, Tedrake 2013)
-        for k in range(self.N):
-            # Relate position and velocity
-            self.optimizer.solver.subject_to(
-                (self.body_position[k+1] - self.body_position[k]) 
-                + self.dt * self.body_velocity[k] 
-                == 0
+                self.q_body_to_world[k + 1] ==
+                (vector_SO3 + rotation_SO3).as_quat()
             )
 
-            # Relate 3D rotation and angular velocity
-            vector_SO3 = lca.SO3Tangent(self.body_angular_velocity[k] * self.dt)
-            rotation_SO3 = lca.SO3(self.body_quat[k])
-            self.optimizer.solver.subject_to(self.body_quat[k + 1] == (vector_SO3 + rotation_SO3).as_quat())
+            # Compute total force acting on the body w.r.t. the world frame
+            total_force = self.control_force_world[k] + self.gravity + self.contact_force_world[k] + self.spring_force_world[k]
 
-            # Relate spring elongation and spring velocity
-            self.optimizer.solver.subject_to(
-                (self.spring_elongation[k+1] - self.spring_elongation[k]) 
-                + self.dt * self.spring_velocity[k] 
-                == 0
+            # Integrate force to get velocity
+            self.optimizer.loose_equals_constraint(
+                self.dt*total_force,
+                BODY_MASS_KG * (self.velocity_world[k+1] - self.velocity_world[k])
             )
 
-        # Contact point is (SPRING_LENGTH + spring_elongation) * -z_body
-        self.contact_point_location = [
-            self.body_position[k] +
-            lca.SO3(self.body_quat[k]).inverse().as_matrix() @
-            ca.vertcat(0, 0, -(SPRING_LENGTH_M + self.spring_elongation[k]))
-            for k in range(self.N+1)
-        ]
+            # Compute total moment acting on the body w.r.t. the body frame
+            # NOTE: Do not transform to world frame b/c angular velocity is in body frame
+            total_moment = self.control_moment_body[k] + self.contact_moment_body[k]
 
-        # 3D contact force applied to at end of spring
-        self.contact_force = [self.optimizer.solver.variable(1) for _ in range(self.N+1)]
+            # Integrate moment to get angular velocity
+            self.optimizer.loose_equals_constraint(
+                self.dt * total_moment,
+                I @ (self.angular_velocity_body[k+1] - self.angular_velocity_body[k])
+            )
 
-        # Forces from 4 flapping wings and constraints on them
-        self.control_forces = [self.optimizer.solver.variable(4, 1) for _ in range(self.N)]
-        self.optimizer.solver.subject_to(
-            ca.vertcat(*self.control_forces) >= 0
+    def setup_initial_and_final_conditions(self):
+        """
+        Sets up the initial and final state constraints for the optimization problem with epsilon regularization.
+        """
+        epsilon = 1e-3  # Small tolerance value
+
+        # Initial state constraints
+        initial_state = self.optimizer.config.initial_state
+
+        self.optimizer.loose_equals_constraint(
+            self.position_world[0],
+            ca.vertcat(*initial_state["position"]),
+            epsilon
         )
-        self.optimizer.solver.subject_to(
-            ca.vertcat(*self.control_forces) <= 5
+        self.optimizer.loose_equals_constraint(
+            self.q_body_to_world[0],
+            ca.vertcat(*initial_state["q_body_to_world"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.velocity_world[0],
+            ca.vertcat(*initial_state["velocity"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.angular_velocity_body[0],
+            ca.vertcat(*initial_state["angular_velocity_body"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.control_thrust[0],
+            initial_state["control_force"],
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.control_moment_body[0],
+            ca.vertcat(*initial_state["control_moment"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.spring_elongation[0],
+            0.0,
+            epsilon
         )
         
-        # Gravity force = m*g
-        self.gravity = BODY_MASS_KG * ca.vertcat(0, 0, -GRAVITY_M_S2)
+        # Final state constraints
+        final_state = self.optimizer.config.final_state
         
-        # Model acceleration dynamics
-        for k in range(self.N):
-            
-            # World to body rotation matrix
-            R = lca.SO3(self.body_quat[k]).inverse().as_matrix()
+        self.optimizer.loose_equals_constraint(
+            self.position_world[self.N],
+            ca.vertcat(*final_state["position"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.q_body_to_world[self.N],
+            ca.vertcat(*final_state["q_body_to_world"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.velocity_world[self.N],
+            ca.vertcat(*final_state["velocity"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.angular_velocity_body[self.N],
+            ca.vertcat(*final_state["angular_velocity_body"]),
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.control_thrust[self.N-1],
+            final_state["control_force"],
+            epsilon
+        )
+        self.optimizer.loose_equals_constraint(
+            self.control_moment_body[self.N-1],
+            ca.vertcat(*final_state["control_moment"]),
+            epsilon
+        )
 
-            # Control forces + moments
-            control_force_1 = ca.vertcat(0, 0, self.control_forces[k][0])
-            control_force_2 = ca.vertcat(0, 0, self.control_forces[k][1])
-            control_force_3 = ca.vertcat(0, 0, self.control_forces[k][2])
-            control_force_4 = ca.vertcat(0, 0, self.control_forces[k][3])
+    def setup_cost(self):
+        """
+        Define the cost function for the optimization problem.
+        """
+        cost_weights = self.optimizer.config.cost_weights
 
-            control_moment_1 = ca.cross(ca.vertcat(ARM_LENGTH_M, 0, 0),  control_force_1)
-            control_moment_2 = ca.cross(ca.vertcat(0, ARM_LENGTH_M, 0),  control_force_2)
-            control_moment_3 = ca.cross(ca.vertcat(-ARM_LENGTH_M, 0, 0), control_force_3)
-            control_moment_4 = ca.cross(ca.vertcat(0, -ARM_LENGTH_M, 0), control_force_4)
+        cost = 0
 
-            total_control_force = R @ (
-                control_force_1 + control_force_2 + control_force_3 + control_force_4
+        for k in range(self.optimizer.config.num_steps):
+            # Define the cost function using weights given in constants.py
+            cost += (
+                cost_weights["T"]*self.optimizer.T
+                + cost_weights["position_world"]*ca.sumsqr(
+                    self.position_world[k] - ca.vertcat(*self.optimizer.config.final_state["position"])
+                )
+                + cost_weights["velocity_world"]*ca.sumsqr(self.velocity_world[k])
+                + cost_weights["q_body_to_world"]*ca.sumsqr(
+                    2*ca.acos(
+                        ca.dot(self.q_body_to_world[k], ca.vertcat(0, 0, 0, 1))
+                    ) # Geodesic Distance for attitude error
+                )
+                + cost_weights["contact_force"]*self.contact_force_z[k]
+                + cost_weights["angular_velocity_body"]*ca.sumsqr(self.angular_velocity_body[k])
+                + cost_weights["control_force"]*ca.sumsqr(
+                    self.control_thrust[k] + self.gravity[2] + self.contact_force_z[k] # Penalize deviation from equilibrium
+                )
+                + cost_weights["control_moment"]*ca.sumsqr(self.control_moment_body[k])
             )
-            total_control_moment =  R @ (
-                control_moment_1 + control_moment_2 + control_moment_3 + control_moment_4 
-            )
 
-            # Contact forces and moments w.r.t. world frame
-            total_contact_force = (
-                self.terrain.normal_vector(self.contact_point_location[k]) * self.contact_force[k]
-            )
-
-            total_contact_moment = (ca.cross(
-                self.contact_point_location[k] - self.body_position[k],
-                total_contact_force
-            ))
-
-            # Spring force
-            spring_force = -SPRING_CONSTANT_N_M * self.spring_elongation[k]
-
-            self.optimizer.solver.subject_to(
-                (self.spring_velocity[k+1] - self.spring_velocity[k]) == self.dt * spring_force
-            )
-
-            # Total force acting on the body w.r.t. the world frame
-            total_force = total_control_force + self.gravity + total_contact_force - R@ca.vertcat(0, 0, spring_force)
-            
-            self.optimizer.solver.subject_to(
-                self.dt*total_force == BODY_MASS_KG * (self.body_velocity[k+1] - self.body_velocity[k])
-            )
-
-            #Total moment acting on the body w.r.t. the world frame
-            total_moment = total_control_moment + total_contact_moment
-            
-            self.optimizer.solver.subject_to(
-                total_moment == I @ (self.body_angular_velocity[k+1] - self.body_angular_velocity[k]) / self.dt
-            )
-            
+        self.optimizer.solver.minimize(cost)

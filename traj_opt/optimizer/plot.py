@@ -13,6 +13,8 @@ def animate_solution(optimizer, solution):
     positions = [solution.value(optimizer.robot_model.position_world[k]) for k in range(optimizer.config.num_steps + 1)]
     quaternions = [solution.value(optimizer.robot_model.q_body_to_world[k]) for k in range(optimizer.config.num_steps + 1)]
 
+    contact_point_location = [solution.value(optimizer.robot_model.contact_point_location[k]) for k in range(optimizer.config.num_steps+1)]
+
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
     ax.set_box_aspect([1, 1, 1])
@@ -28,7 +30,7 @@ def animate_solution(optimizer, solution):
     (z_line,) = ax.plot([0, 0], [0, 0], [1], "blue")
 
     # Set plot limits based on data range
-    pos_array = np.array(positions)
+    pos_array = np.array(contact_point_location)
     ax.set_xlim([pos_array[:, 0].min() - 1, pos_array[:, 0].max() + 1])
     ax.set_ylim([pos_array[:, 1].min() - 1, pos_array[:, 1].max() + 1])
     ax.set_zlim([pos_array[:, 2].min() - 1, pos_array[:, 2].max() + 1])
@@ -44,6 +46,10 @@ def animate_solution(optimizer, solution):
     def update_frame(i):
         pos_i = positions[i]
         rotation = R.from_quat(quaternions[i]).as_matrix()
+
+        # Plot the contact point
+        contact_point = contact_point_location[i]
+        ax.scatter(contact_point[0], contact_point[1], contact_point[2], color="red")
         
         x_end = pos_i + rotation @ x_cords
         y_end = pos_i + rotation @ y_cords
@@ -69,41 +75,48 @@ def animate_solution(optimizer, solution):
     ani.save("latest_trajectory.gif", writer=writergif)
     plt.show()
 
-    # # Plot the control forces over time
-    # control_forces = [solution.value(optimizer.robot_model.control_force[k]) for k in range(optimizer.config.num_steps)]
-    # control_forces = np.array(control_forces)
-    # plt.plot(control_forces - 9.81)
+    # Plot the control forces over time
+    control_forces = [solution.value(optimizer.robot_model.control_thrust[k]) for k in range(optimizer.config.num_steps)]
+    control_forces = np.array(control_forces)
+    plt.plot(control_forces - 9.81)
+    plt.xlabel("Time")
+    plt.ylabel("Control Force")
+    plt.title("Control Force vs Time")
+    plt.legend(["Force"])
+    plt.show()
+
+    # Plot the control moments over time
+    control_moments = [solution.value(optimizer.robot_model.control_moment_body[k]) for k in range(optimizer.config.num_steps)]
+    control_moments = np.array(control_moments)
+    plt.plot(control_moments)
+    plt.xlabel("Time")
+    plt.ylabel("Control Moment")
+    plt.title("Control Moment vs Time")
+    plt.legend(["Moment"])
+    plt.show()
+
+    # # Plot the spring force over time
+    # spring_force = [solution.value(optimizer.robot_model.spring_force[k]) for k in range(optimizer.config.num_steps)]
+    # spring_force = np.array(spring_force)
+    # plt.plot(spring_force)
     # plt.xlabel("Time")
-    # plt.ylabel("Control Force")
-    # plt.title("Control Force vs Time")
+    # plt.ylabel("Spring Force")
+    # plt.title("Spring Force vs Time")
     # plt.legend(["Force"])
     # plt.show()
 
-    # # Plot the position over time
-    # position = [solution.value(optimizer.robot_model.position_world[k]) for k in range(optimizer.config.num_steps)]
-    # position = np.array(position)
-    # plt.plot(position)
-    # plt.xlabel("Time")
-    # plt.ylabel("Position")
-    # plt.title("Position vs Time")
-    # plt.legend(["X", "Y", "Z"])
-    # plt.show()
-
-    # # Plot the velocity over time
-    # velocity = [solution.value(optimizer.robot_model.velocity_world[k]) for k in range(optimizer.config.num_steps)]
-    # velocity = np.array(velocity)
-    # plt.plot(velocity)
-    # plt.xlabel("Time")
-    # plt.ylabel("Velocity")
-    # plt.title("Velocity vs Time")
-    # plt.legend(["X", "Y", "Z"])
-    # plt.show()
-
-    # Plot the sdf of the contact points over time
+    # Plot the SDF of the contact points over time
     sdf = [solution.value(optimizer.robot_model.sdf_value[k]) for k in range(optimizer.config.num_steps)]
     sdf = np.array(sdf)
     plt.plot(sdf)
     plt.xlabel("Time")
     plt.ylabel("SDF")
     plt.show()
-    
+
+    # Plot the spring elongation over time
+    spring_elongation = [solution.value(optimizer.robot_model.spring_elongation[k]) for k in range(optimizer.config.num_steps)]
+    spring_elongation = np.array(spring_elongation)
+    plt.plot(spring_elongation)
+    plt.xlabel("Time")
+    plt.ylabel("Spring Elongation")
+    plt.show()

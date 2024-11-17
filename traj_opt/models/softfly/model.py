@@ -40,12 +40,12 @@ class Softfly:
         Setup all variables for the optimization problem.
         """
         # State variables (q)
-        self.position_world  = [self.optimizer.solver.variable(3, 1) for _ in range(self.N + 1)]
-        self.q_body_to_world = [self.optimizer.solver.variable(4, 1) for _ in range(self.N + 1)]
+        self.position_world  = [self.optimizer.solver.variable(3) for _ in range(self.N + 1)]
+        self.q_body_to_world = [self.optimizer.solver.variable(4) for _ in range(self.N + 1)]
 
         # Derivatives of the state variables (qdot)
-        self.velocity_world        = [self.optimizer.solver.variable(3, 1) for _ in range(self.N + 1)]
-        self.angular_velocity_body = [self.optimizer.solver.variable(3, 1) for _ in range(self.N + 1)]
+        self.velocity_world        = [self.optimizer.solver.variable(3) for _ in range(self.N + 1)]
+        self.angular_velocity_body = [self.optimizer.solver.variable(3) for _ in range(self.N + 1)]
 
         # Control force + moment (wrench)
         self.control_thrust = [self.optimizer.solver.variable(1) for _ in range(self.N)]
@@ -140,12 +140,13 @@ class Softfly:
             # Contact force in world frame
             self.contact_force_world[k] = self.surface_normal[k] * self.contact_force_z[k]
 
-            # Contact force in body frame
+            # Contact moment in body frame
             R_world_to_body = lca.SO3(self.q_body_to_world[k]).inverse().as_matrix()
             moment_arm = (self.contact_point_location[k] - self.position_world[k])
             self.contact_moment_body[k] = R_world_to_body @ ca.cross(moment_arm, self.contact_force_world[k])
 
             # Complimentary constraint
+            # Contact force is only nonzero during contact
             self.optimizer.solver.subject_to(
                 self.contact_force_z[k] * self.terrain.sdf(self.contact_point_location[k]) == 0
             )
@@ -197,7 +198,7 @@ class Softfly:
 
             # Integrate moment to get angular velocity
             self.optimizer.solver.subject_to(
-                total_moment == I @ (self.angular_velocity_body[k+1] - self.angular_velocity_body[k]) / self.dt
+                self.dt * total_moment == I @ (self.angular_velocity_body[k+1] - self.angular_velocity_body[k]) 
             )
 
     def setup_initial_and_final_conditions(self):
