@@ -3,7 +3,7 @@ import casadi as ca
 from traj_opt.optimizer.plot import animate_solution
 
 from traj_opt.config import (
-    TrajOptConfig, 
+    TrajOptConfig,
     robot_name_to_model_map,
     terrain_name_to_model_map
 )
@@ -12,7 +12,7 @@ from traj_opt.config import (
 class Optimizer:
     """
     This class reads the configuration parameters from the TrajOptConfig object,
-    initializes the robot and terrain models, and solves the optimal control 
+    initializes the robot and terrain models, and solves the optimal control
     problem (OCP) using IPOPT.
     """
     def __init__(self, config: TrajOptConfig):
@@ -41,7 +41,7 @@ class Optimizer:
         """
         # Free time variable
         self.T = self.solver.variable()
-        
+
         # Timestep size
         self.h = self.solver.variable()
 
@@ -53,13 +53,13 @@ class Optimizer:
 
         self.solver.set_initial(self.T, 1.0)  # Initial guess for T
         self.solver.set_initial(self.h, 1.0 / self.config.num_steps)  # Initial guess for h
-    
+
     def solve(self):
         """
         Solves the OCP and calls animate_solution to visualize the solution.
         """
         # Solve the optimization problem
-        
+
         plugin_opts = {
             "expand": True
         }
@@ -87,7 +87,7 @@ class Optimizer:
             self.solver.debug.show_infeasibilities()
             print("Solver failed:", e)
             return None
-        
+
         # Print the trajectory time
         print("Trajectory time:", self.solution.value(self.T))
         print("Timestep size:", self.solution.value(self.h))

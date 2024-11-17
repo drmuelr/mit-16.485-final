@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - casadi
+  - liecasadi
+  - matplotlib
+  - pydantic
+  - python

@@ -1,2 +1,5 @@
 venv/
+
+# VS Code files
+*.code-workspace
 .vscode/
