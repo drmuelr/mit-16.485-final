@@ -21,11 +21,23 @@ Maps a terrain model name to the corresponding model class.
 
 class TrajOptConfig(BaseModel):
     
-    robot_name: str = "softfly"
+    save_solution_as: str = "solution.npz"
+    """
+    The name of the file to save the solution to.
+    """
+
+    initial_guess_path: str = "solution.npz"
+    """
+    The name of the .npz file to load the initial guess from.
+
+    If no file is found, no initial guess is used.
+    """
+
+    robot_name: str = "hopping_softfly"
     """
     The name of the robot model being used for optimization.
     """
-
+    
     initial_state: dict[str, FiniteFloat] = {
         "position": [0.0, 0.0, 1.0],
         "velocity": [0.0, 0.0, 0.0],
@@ -39,7 +51,7 @@ class TrajOptConfig(BaseModel):
     """
 
     final_state: dict[str, FiniteFloat] = {
-        "position": [1.0, 0.0, 1.0],
+        "position": [0.0, 0.0, 1.2],
         "velocity": [0.0, 0.0, 0.0],
         "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
         "angular_velocity_body": [0.0, 0.0, 0.0],
@@ -54,19 +66,18 @@ class TrajOptConfig(BaseModel):
         'position_world': 0.0,
         'velocity_world': 0.0,
         'q_body_to_world': 0.0,
-        'angular_velocity_body': 0.0,
-        'control_force': 0.01,
-        'control_moment': 0.01,
-        'contact_force': 0.0,
+        'angular_velocity_body': 0.00,
+        'control_force': 0.0,
+        'control_moment': 0.0,
+        'contact_force': 10000,
         'T': 1.0
     }
     """
     Cost function weights for the optimization problem.
-
     Keys correspond with casadi variable names defined in the model.
     """
 
-    num_steps: int = 50
+    num_steps: int = 100
     """
     The number of steps that the trajectory is discretely broken into.
 
@@ -83,7 +94,7 @@ class TrajOptConfig(BaseModel):
         - Available options: ["flat_preset"]
     """
 
-    max_time: FiniteFloat = 10.0
+    max_time: FiniteFloat = 2.0
     """
     The maximum time allowed to reach the final position from the initial position.
     """

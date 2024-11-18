@@ -1,4 +1,5 @@
 import casadi as ca
+import numpy as np
 
 from traj_opt.optimizer.plot import animate_solution
 
@@ -35,6 +36,9 @@ class Optimizer:
         # Initialize the robot model
         self.robot_model = robot_name_to_model_map[config.robot_name](self, self.terrain_model)
 
+        # Load the initial guess
+        self.load_initial_guess()
+
     def setup_free_time(self):
         """
         Sets up the constraints related to free time in the OCP.
@@ -48,11 +52,8 @@ class Optimizer:
         # Constrain timestep size using h = T / num_steps
         self.solver.subject_to(self.h == self.T / self.config.num_steps)
 
-        self.solver.subject_to(self.T > 0.5)
+        self.solver.subject_to(self.T > 0.1)
         self.solver.subject_to(self.T < self.config.max_time)
-
-        self.solver.set_initial(self.T, 1.0)  # Initial guess for T
-        self.solver.set_initial(self.h, 1.0 / self.config.num_steps)  # Initial guess for h
 
     def solve(self):
         """
@@ -64,18 +65,15 @@ class Optimizer:
             "expand": True
         }
         solver_options = {
-            "tol": 1e-6,
-            "acceptable_tol": 1e-4,
-            "max_iter": 100000,
-            "mu_strategy": "adaptive",
-            "nlp_scaling_method": "gradient-based",
-            "nlp_scaling_max_gradient": 100,
-            "hessian_approximation": "limited-memory",
-            "jacobian_approximation": "finite-difference-values",
-            "max_soc": 4,
-            "derivative_test": "none",  # Enable for debugging
+            "tol": 1e-6,                # Set convergence tolerance
+            "max_iter": 100000,           # Increase iteration limit
+            # "mu_strategy": "adaptive",  # Dynamic barrier parameter adjustment
+            # "nlp_scaling_method": "gradient-based",  # Enable scaling
+            # "nlp_scaling_max_gradient": 100,
+            # "derivative_test": "none",  # Disable derivative checker
             "print_level": self.config.ipopt_print_level
         }
+
         self.solver.solver("ipopt", plugin_opts, solver_options)
 
         try:
@@ -84,7 +82,6 @@ class Optimizer:
             print("Solver successful!")
 
         except Exception as e:
-            self.solver.debug.show_infeasibilities()
             print("Solver failed:", e)
             return None
 
@@ -92,16 +89,60 @@ class Optimizer:
         print("Trajectory time:", self.solution.value(self.T))
         print("Timestep size:", self.solution.value(self.h))
 
+        # Save the solution to a file
+        self.save_solution()
+
         # Animate the solution
         animate_solution(self, self.solution)
 
-    def loose_equals_constraint(self, a, b, tolerance=1e-8):
+    def save_solution(self):
         """
-        Creates a constraint that forces two values to be approximately equal.
+        Save the solution to the file specified in the config.
         """
-        self.solver.subject_to(
-            a - b <= tolerance
-        )
-        self.solver.subject_to(
-            b - a <= tolerance
-        )
+        position = [self.solution.value(self.robot_model.position_world[k]) for k in range(self.config.num_steps + 1)]
+        velocity = [self.solution.value(self.robot_model.velocity_world[k]) for k in range(self.config.num_steps + 1)]
+
+        q_body_to_world = [self.solution.value(self.robot_model.q_body_to_world[k]) for k in range(self.config.num_steps + 1)]
+        angular_velocity_body = [self.solution.value(self.robot_model.angular_velocity_body[k]) for k in range(self.config.num_steps + 1)]
+
+        control_thrust = [self.solution.value(self.robot_model.control_thrust[k]) for k in range(self.config.num_steps + 1)]
+        control_moment_body = [self.solution.value(self.robot_model.control_moment_body[k]) for k in range(self.config.num_steps + 1)]
+
+        T = self.solution.value(self.T)
+        h = self.solution.value(self.h)
+
+        np.savez(self.config.save_solution_as,
+                 position=position,
+                 velocity=velocity,
+                 q_body_to_world=q_body_to_world,
+                 angular_velocity_body=angular_velocity_body,
+                 control_thrust=control_thrust,
+                 control_moment_body=control_moment_body,
+                 T=T,
+                 h=h)
+        
+        print("Saved solution to:", self.config.save_solution_as)
+
+    def load_initial_guess(self):
+        """
+        Load an initial guess from the file specified in the config.
+        """
+        init_guess_path = self.config.initial_guess_path
+
+        try:
+            init_guess = np.load(init_guess_path)
+            print("Loaded initial guess from:", init_guess_path)
+
+        except Exception as e:
+            print(f"No initial guess found at {init_guess_path}:", e)
+            return
+
+        for k in range(self.config.num_steps + 1):
+            self.solver.set_initial(self.robot_model.position_world[k], init_guess["position"][k])
+            self.solver.set_initial(self.robot_model.velocity_world[k], init_guess["velocity"][k])
+            self.solver.set_initial(self.robot_model.q_body_to_world[k], init_guess["q_body_to_world"][k])
+            self.solver.set_initial(self.robot_model.angular_velocity_body[k], init_guess["angular_velocity_body"][k])
+            self.solver.set_initial(self.robot_model.control_thrust[k], init_guess["control_thrust"][k])
+            self.solver.set_initial(self.robot_model.control_moment_body[k], init_guess["control_moment_body"][k])
+            self.solver.set_initial(self.T, init_guess["T"])
+            self.solver.set_initial(self.h, init_guess["h"])

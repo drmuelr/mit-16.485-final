@@ -20,14 +20,9 @@ MAX_THRUST_N = 30.0
 Maximum vertical thrust that can be applied by the wings [N].
 """
 
-MAX_TORQUE_XY_N_M = 10.0
+MAX_TORQUE_XY_N_M = ARM_LENGTH_M * MAX_THRUST_N
 """
 Maximum X/Y torque that can be applied by the wings [N*m].
-"""
-
-MAX_TORQUE_Z_N_M = 5.0
-"""
-Maximum Z torque that can be applied by the wings [N*m].
 """
 
 I = ca.diag(ca.vertcat(0.1, 0.1, 0.1))

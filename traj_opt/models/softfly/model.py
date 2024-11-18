@@ -48,14 +48,14 @@ class Softfly:
         self.angular_velocity_body = [self.optimizer.solver.variable(3) for _ in range(self.N + 1)]
 
         # Control force + moment (wrench)
-        self.control_thrust = [self.optimizer.solver.variable(1) for _ in range(self.N)]
-        self.control_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N)]
-        self.control_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+        self.control_thrust = [self.optimizer.solver.variable(1)      for _ in range(self.N+1)]
+        self.control_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+        self.control_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
 
         # Contact forces and moments
-        self.contact_force_z     = [self.optimizer.solver.variable()  for _ in range(self.N)]
-        self.contact_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N)]
-        self.contact_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+        self.contact_force_z     = [self.optimizer.solver.variable()  for _ in range(self.N+1)]
+        self.contact_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+        self.contact_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
 
         # Surface normal at contact point
         self.surface_normal = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
@@ -68,10 +68,10 @@ class Softfly:
         self.gravity = ca.vertcat(0, 0, -BODY_MASS_KG*GRAVITY_M_S2)
 
         # Total force acting on body w.r.t. world frame
-        self.total_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+        self.total_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
 
         # Total moment acting on body w.r.t. body frame
-        self.total_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N)]
+        self.total_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
     
     def setup_actuators(self):
         """
@@ -82,7 +82,9 @@ class Softfly:
         for k in range(self.N):
             # Control force w.r.t. world frame
             R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
-            self.control_force_world[k]  = R_body_to_world @ ca.vertcat(0, 0, self.control_thrust[k])
+            self.optimizer.solver.subject_to(
+                self.control_force_world[k] == R_body_to_world @ ca.vertcat(0, 0, self.control_thrust[k])
+            )
 
             # Thrust limits
             self.optimizer.solver.subject_to(
@@ -116,42 +118,52 @@ class Softfly:
             2. Contact force always positive
             3. Complimentary constraint
         """
-        epsilon = 1e-3  # Small regularization parameter
-
         for k in range(self.N+1):
             # Contact point location
-            self.contact_point_location[k] = (
-                self.position_world[k] 
+            self.optimizer.solver.subject_to(
+                self.contact_point_location[k] == self.position_world[k]
             )
 
             # Surface normal at contact point
-            self.surface_normal[k] = self.terrain.normal_vector(self.contact_point_location[k])
+            self.optimizer.solver.subject_to(
+                self.surface_normal[k] == 
+                self.terrain.normal_vector(self.contact_point_location[k])
+            )    
 
             # Signed distance function value
-            self.sdf_value[k] = self.terrain.sdf(self.contact_point_location[k])
+            self.optimizer.solver.subject_to(
+                self.sdf_value[k] == 
+                self.terrain.sdf(self.contact_point_location[k])
+            )
 
-            # Non-penetration constraint
+            # Non-penetration constraint (eq 8 in the paper)
             self.optimizer.solver.subject_to(
                 self.sdf_value[k] >= 0
             )
-
         
         for k in range(self.N):
             # Contact force in world frame
-            self.contact_force_world[k] = self.surface_normal[k] * self.contact_force_z[k]
+            self.optimizer.solver.subject_to(
+                self.contact_force_world[k] == 
+                self.surface_normal[k] * self.contact_force_z[k]
+            )
 
             # Contact moment in body frame
             R_world_to_body = lca.SO3(self.q_body_to_world[k]).inverse().as_matrix()
             moment_arm = (self.contact_point_location[k] - self.position_world[k])
-            self.contact_moment_body[k] = R_world_to_body @ ca.cross(moment_arm, self.contact_force_world[k])
+
+            self.optimizer.solver.subject_to(
+                self.contact_moment_body[k] == 
+                R_world_to_body @ ca.cross(moment_arm, self.contact_force_world[k])
+            )
 
             # Complimentary constraint
-            # Contact force is only nonzero during contact
+            # Contact force is only nonzero during contact (eq 13 in the paper)
             self.optimizer.solver.subject_to(
                 self.contact_force_z[k] * self.terrain.sdf(self.contact_point_location[k]) == 0
             )
 
-            # Contact force is positive
+            # Contact force is positive (eq 9a in the paper)
             self.optimizer.solver.subject_to(
                 self.contact_force_z[k] >= 0
             )
@@ -175,26 +187,31 @@ class Softfly:
             # Integrate velocity to get position
             self.optimizer.solver.subject_to(
                 (self.position_world[k+1] - self.position_world[k]) 
-                == self.dt * self.velocity_world[k] 
+                == self.dt * self.velocity_world[k+1] 
             )
         
             # Integrate angular velocity to get orientation
             # Leverage Lie Group properties to optimize on SO(3) manifold
-            vector_SO3 = lca.SO3Tangent(self.angular_velocity_body[k] * self.dt)
+            vector_SO3 = lca.SO3Tangent(self.angular_velocity_body[k+1] * self.dt)
             rotation_SO3 = lca.SO3(self.q_body_to_world[k])
-            self.optimizer.solver.subject_to(self.q_body_to_world[k + 1] == (vector_SO3 + rotation_SO3).as_quat())
+            self.optimizer.solver.subject_to(
+                self.q_body_to_world[k + 1] ==
+                (vector_SO3 + rotation_SO3).as_quat()
+            )
 
             # Compute total force acting on the body w.r.t. the world frame
-            total_force = self.control_force_world[k] + self.gravity + self.contact_force_world[k]
+            total_force = (
+                self.control_force_world[k+1] + self.gravity + self.contact_force_world[k+1]
+            )
 
             # Integrate force to get velocity
             self.optimizer.solver.subject_to(
-                self.dt*total_force == BODY_MASS_KG * (self.velocity_world[k+1] - self.velocity_world[k])
+                self.dt * total_force == BODY_MASS_KG * (self.velocity_world[k+1] - self.velocity_world[k])
             )
 
             # Compute total moment acting on the body w.r.t. the body frame
             # NOTE: Do not transform to world frame b/c angular velocity is in body frame
-            total_moment = self.control_moment_body[k] + self.contact_moment_body[k]
+            total_moment = self.control_moment_body[k+1] + self.contact_moment_body[k+1]
 
             # Integrate moment to get angular velocity
             self.optimizer.solver.subject_to(
