@@ -1,13 +1,9 @@
 import casadi as ca
 import numpy as np
 
-from traj_opt.models import RobotBase
 from traj_opt.optimizer.plot import animate_solution
 
-from traj_opt.config import (
-    TrajOptConfig,
-    robot_name_to_model_map,
-)
+from traj_opt.config import TrajOptConfig
 
 
 class Optimizer:
@@ -34,7 +30,7 @@ class Optimizer:
         self.terrain_model = config.terrain_source()
 
         # Initialize the robot model
-        self.robot_model: RobotBase = robot_name_to_model_map[config.robot_name](self, self.terrain_model)
+        self.robot_model = config.robot_class(self, self.terrain_model)
 
         # Load the initial guess
         self.load_initial_guess()

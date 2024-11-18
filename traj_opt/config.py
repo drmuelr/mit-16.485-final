@@ -1,14 +1,11 @@
-from traj_opt.models import HoppingSoftfly, FlatTerrain, Softfly
+from traj_opt.models import (
+    HoppingSoftfly,
+    FlatTerrain,
+    RobotBase,
+    Softfly,
+)
 from traj_opt.models.terrain.base import TerrainBase
 
-
-robot_name_to_model_map = {
-    "hopping_softfly": HoppingSoftfly,
-    "softfly": Softfly
-}
-"""
-Maps a robot model name to the corresponding model class.
-"""
 
 class TrajOptConfig:
 
@@ -24,7 +21,7 @@ class TrajOptConfig:
     If no file is found, no initial guess is used.
     """
 
-    robot_name: str = "hopping_softfly"
+    robot_class: type[RobotBase] = HoppingSoftfly
     """
     The name of the robot model being used for optimization.
     """
