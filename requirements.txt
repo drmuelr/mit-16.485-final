@@ -1,4 +1,3 @@
 casadi
 liecasadi
-pydantic
 matplotlib

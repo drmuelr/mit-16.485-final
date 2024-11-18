@@ -5,5 +5,4 @@ dependencies:
   - casadi
   - liecasadi
   - matplotlib
-  - pydantic
   - python
