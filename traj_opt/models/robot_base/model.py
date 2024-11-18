@@ -1,9 +1,14 @@
+# Bandaid for circular import. Real solution is to not have circular depdenence.
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from traj_opt.optimizer.optimizer import Optimizer
+
 from abc import ABC, abstractmethod
 
 from casadi import MX, SX
 
 from traj_opt.models.terrain.base import TerrainBase
-from traj_opt.optimizer.optimizer import Optimizer
 
 
 __all__ = [

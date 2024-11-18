@@ -1,10 +1,15 @@
+# Bandaid for circular import. Real solution is to not have circular depdenence.
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from traj_opt.optimizer.optimizer import Optimizer
+
 import casadi as ca
 import liecasadi as lca
 
 from traj_opt.models.robot_base.model import RobotBase
 from traj_opt.models.terrain.base import TerrainBase
 from traj_opt.models.softfly.constants import *
-from traj_opt.optimizer.optimizer import Optimizer
 
 
 class Softfly(RobotBase):
