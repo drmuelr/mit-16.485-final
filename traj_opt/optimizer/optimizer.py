@@ -6,7 +6,6 @@ from traj_opt.optimizer.plot import animate_solution
 from traj_opt.config import (
     TrajOptConfig,
     robot_name_to_model_map,
-    terrain_name_to_model_map
 )
 
 
@@ -31,7 +30,7 @@ class Optimizer:
         self.setup_free_time()
 
         # Initialize the terrain model
-        self.terrain_model = terrain_name_to_model_map[config.terrain_source]()
+        self.terrain_model = config.terrain_source()
 
         # Initialize the robot model
         self.robot_model = robot_name_to_model_map[config.robot_name](self, self.terrain_model)
