@@ -50,7 +50,7 @@ def animate_solution(optimizer, solution):
         # Plot the contact point
         contact_point = contact_point_location[i]
         ax.scatter(contact_point[0], contact_point[1], contact_point[2], color="red")
-        
+
         x_end = pos_i + rotation @ x_cords
         y_end = pos_i + rotation @ y_cords
         z_end = pos_i + rotation @ z_cords
@@ -71,8 +71,9 @@ def animate_solution(optimizer, solution):
     ani = animation.FuncAnimation(fig, update_frame, frames=optimizer.config.num_steps + 1, repeat=False, interval=1000/fps)
 
     # Save as GIF or show the animation
+    gif_filepath = "results/latest_trajectory.gif"
     writergif = animation.PillowWriter(fps=fps)
-    ani.save("latest_trajectory.gif", writer=writergif)
+    ani.save(gif_filepath, writer=writergif)
     plt.show()
 
     # Plot the control forces over time

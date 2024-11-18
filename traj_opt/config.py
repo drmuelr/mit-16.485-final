@@ -19,12 +19,12 @@ Maps a terrain model name to the corresponding model class.
 
 class TrajOptConfig:
 
-    save_solution_as: str = "solution.npz"
+    save_solution_as: str = "results/solution.npz"
     """
     The name of the file to save the solution to.
     """
 
-    initial_guess_path: str = "solution.npz"
+    initial_guess_path: str = "results/solution.npz"
     """
     The name of the .npz file to load the initial guess from.
 
