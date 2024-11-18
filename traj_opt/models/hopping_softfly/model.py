@@ -1,13 +1,15 @@
 import casadi as ca
 import liecasadi as lca
 
+from traj_opt.models.robot_base.model import RobotBase
 from traj_opt.models.terrain.base import TerrainBase
 from traj_opt.models.hopping_softfly.constants import *
+from traj_opt.optimizer.optimizer import Optimizer
 
 
-class HoppingSoftfly:
+class HoppingSoftfly(RobotBase):
 
-    def __init__(self, optimizer, terrain: TerrainBase):
+    def __init__(self, optimizer: Optimizer, terrain: TerrainBase):
 
         # Store the optimizer
         self.optimizer = optimizer

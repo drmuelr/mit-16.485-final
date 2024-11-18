@@ -1,0 +1,23 @@
+from abc import ABC, abstractmethod
+
+from casadi import MX, SX
+
+from traj_opt.models.terrain.base import TerrainBase
+from traj_opt.optimizer.optimizer import Optimizer
+
+
+__all__ = [
+    "RobotBase",
+]
+
+
+class RobotBase(ABC):
+
+    @abstractmethod
+    def __init__(self, optimizer: Optimizer, terrain: TerrainBase):
+        self.position_world: list[MX]
+        self.velocity_world: list[MX]
+        self.q_body_to_world: list[MX]
+        self.angular_velocity_body: list[MX]
+        self.control_thrust: list[SX]
+        self.control_moment_body: list[MX]
