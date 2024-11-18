@@ -1,3 +1,5 @@
+from typing import cast
+
 import casadi as ca
 import numpy as np
 
@@ -18,7 +20,7 @@ class Optimizer:
         """
         # Free-time Optimal Control Problem
         self.solver = ca.Opti()
-        self.solution = None
+        self.solution: ca.OptiSol | None = None
 
         # Store the optimizer configuration
         self.config = config
@@ -81,6 +83,8 @@ class Optimizer:
             print("Solver failed:", e)
             return None
 
+        self.solution = cast(ca.OptiSol, self.solution)
+
         # Print the trajectory time
         print("Trajectory time:", self.solution.value(self.T))
         print("Timestep size:", self.solution.value(self.h))
@@ -95,6 +99,8 @@ class Optimizer:
         """
         Save the solution to the file specified in the config.
         """
+        self.solution = cast(ca.OptiSol, self.solution)
+
         position = [self.solution.value(self.robot_model.position_world[k]) for k in range(self.config.num_steps + 1)]
         velocity = [self.solution.value(self.robot_model.velocity_world[k]) for k in range(self.config.num_steps + 1)]
 
