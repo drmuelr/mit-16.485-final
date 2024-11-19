@@ -24,5 +24,5 @@ class RobotBase(ABC):
         self.velocity_world: list[MX]
         self.q_body_to_world: list[MX]
         self.angular_velocity_body: list[MX]
-        self.control_thrust: list[SX]
+        self.control_thrusts: list[MX]
         self.control_moment_body: list[MX]

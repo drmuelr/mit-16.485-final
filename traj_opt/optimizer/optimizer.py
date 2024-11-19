@@ -50,7 +50,7 @@ class Optimizer:
         # Constrain timestep size using h = T / num_steps
         self.solver.subject_to(self.h == self.T / self.config.num_steps)
 
-        self.solver.subject_to(self.T > 0.1)
+        self.solver.subject_to(self.T > 0.01)
         self.solver.subject_to(self.T < self.config.max_time)
 
     def solve(self):
@@ -63,12 +63,13 @@ class Optimizer:
             "expand": True
         }
         solver_options = {
-            "tol": 1e-6,                # Set convergence tolerance
+            "tol": 1e-3,                # Set convergence tolerance
             "max_iter": 100000,           # Increase iteration limit
-            # "mu_strategy": "adaptive",  # Dynamic barrier parameter adjustment
-            # "nlp_scaling_method": "gradient-based",  # Enable scaling
-            # "nlp_scaling_max_gradient": 100,
-            # "derivative_test": "none",  # Disable derivative checker
+            "mu_strategy": "adaptive",  # Dynamic barrier parameter adjustment
+            "nlp_scaling_method": "gradient-based",  # Enable scaling
+            "nlp_scaling_max_gradient": 100,
+            "derivative_test": "none",  # Disable derivative checker
+            "hessian_approximation": "limited-memory",  # Use L-BFGS for Hessian approximation
             "print_level": self.config.ipopt_print_level
         }
 
@@ -107,8 +108,10 @@ class Optimizer:
         q_body_to_world = [self.solution.value(self.robot_model.q_body_to_world[k]) for k in range(self.config.num_steps + 1)]
         angular_velocity_body = [self.solution.value(self.robot_model.angular_velocity_body[k]) for k in range(self.config.num_steps + 1)]
 
-        control_thrust = [self.solution.value(self.robot_model.control_thrust[k]) for k in range(self.config.num_steps + 1)]
+        control_thrusts = [self.solution.value(self.robot_model.control_thrusts[k]) for k in range(self.config.num_steps + 1)]
         control_moment_body = [self.solution.value(self.robot_model.control_moment_body[k]) for k in range(self.config.num_steps + 1)]
+
+        spring_elongation = [self.solution.value(self.robot_model.spring_elongation[k]) for k in range(self.config.num_steps + 1)]
 
         T = self.solution.value(self.T)
         h = self.solution.value(self.h)
@@ -118,8 +121,9 @@ class Optimizer:
                  velocity=velocity,
                  q_body_to_world=q_body_to_world,
                  angular_velocity_body=angular_velocity_body,
-                 control_thrust=control_thrust,
+                 control_thrusts=control_thrusts,
                  control_moment_body=control_moment_body,
+                 spring_elongation=spring_elongation,
                  T=T,
                  h=h)
         
@@ -144,7 +148,7 @@ class Optimizer:
             self.solver.set_initial(self.robot_model.velocity_world[k], init_guess["velocity"][k])
             self.solver.set_initial(self.robot_model.q_body_to_world[k], init_guess["q_body_to_world"][k])
             self.solver.set_initial(self.robot_model.angular_velocity_body[k], init_guess["angular_velocity_body"][k])
-            self.solver.set_initial(self.robot_model.control_thrust[k], init_guess["control_thrust"][k])
+            self.solver.set_initial(self.robot_model.control_thrusts[k], init_guess["control_thrusts"][k])
             self.solver.set_initial(self.robot_model.control_moment_body[k], init_guess["control_moment_body"][k])
             self.solver.set_initial(self.T, init_guess["T"])
             self.solver.set_initial(self.h, init_guess["h"])

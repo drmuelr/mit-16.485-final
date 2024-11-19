@@ -20,7 +20,7 @@ class FlatTerrain(TerrainBase):
 
         # Calculate the gradient (Jacobian) of the sdf function
         sdf_gradient = ca.jacobian(sdf_expr, ca.vertcat(x_pos, y_pos, z_pos))
-        self.sdf_gradient_func = ca.Function('sdf_gradient', [x_pos, y_pos, z_pos], [sdf_gradient], ['x', 'y', 'z'], ['gradient'])
+        self.sdf_gradient_func = ca.Function('flat_sdf_gradient', [x_pos, y_pos, z_pos], [sdf_gradient], ['x', 'y', 'z'], ['gradient'])
 
     def sdf(self, position):
         # Evaluate the SDF at the given position
