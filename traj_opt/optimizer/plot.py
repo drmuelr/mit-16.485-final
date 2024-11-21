@@ -72,117 +72,100 @@ def animate_solution(optimizer, solution):
         return x_line, y_line, z_line, contact_line
 
     # Create the animation
-    fps = 1 / solution.value(optimizer.h)
+    fps = 1 / solution.value(optimizer.h) / 2
     ani = animation.FuncAnimation(fig, update_frame, frames=optimizer.config.num_steps + 1, repeat=True, interval=1000 / fps)
 
     # Save as GIF or show the animation
-    gif_filepath = "results/latest_trajectory.gif"
+    gif_filepath = optimizer.config.save_solution_as[:-3] + "gif"
     writergif = animation.PillowWriter(fps=fps)
     ani.save(gif_filepath, writer=writergif)
     plt.show()
 
+    fig, axs = plt.subplots(3,2, figsize=(15,15))
+
     # Plot the control forces over time
     control_forces = [solution.value(optimizer.robot_model.control_thrusts[k]) for k in range(optimizer.config.num_steps+1)]
     control_forces = np.array(control_forces)
-    plt.plot(control_forces)
-    plt.xlabel("Time")
-    plt.ylabel("Control Forces")
-    plt.title("Control Forces vs Time")
-    plt.legend(["Thrust_1", "Thrust_2", "Thrust_3", "Thrust_4"])
-    plt.show()
+    axs[0,0].plot(control_forces)
+    axs[0,0].set_xlabel("Time")
+    axs[0,0].set_ylabel("Control Forces")
+    axs[0,0].set_title("Control Forces vs Time")
+    axs[0,0].legend(["Thrust_1", "Thrust_2", "Thrust_3", "Thrust_4"])
 
     # Plot the control moments over time
     control_moments = [solution.value(optimizer.robot_model.control_moment_body[k]) for k in range(optimizer.config.num_steps+1)]
     control_moments = np.array(control_moments)
-    plt.plot(control_moments)
-    plt.xlabel("Time")
-    plt.ylabel("Control Moment")
-    plt.title("Control Moment vs Time")
-    plt.legend(["Moment"])
-    plt.show()
+    axs[0,1].plot(control_moments)
+    axs[0,1].set_xlabel("Time")
+    axs[0,1].set_ylabel("Control Moment")
+    axs[0,1].set_title("Control Moment vs Time")
+    axs[0,1].legend(["Moment"])
 
     # Plot position over time
     positions = np.array(positions)
-    plt.plot(positions)
-    plt.xlabel("Time")
-    plt.ylabel("Position")
-    plt.title("Position vs Time")
-    plt.legend(["X", "Y", "Z"])
-    plt.show()
+    axs[1,0].plot(positions)
+    axs[1,0].set_xlabel("Time")
+    axs[1,0].set_ylabel("Position")
+    axs[1,0].set_title("Position vs Time")
+    axs[1,0].legend(["X", "Y", "Z"])
     
     # Plot the velocity over time
     velocities = [solution.value(optimizer.robot_model.velocity_world[k]) for k in range(optimizer.config.num_steps+1)]
     velocities = np.array(velocities)
-    plt.plot(velocities)
-    plt.xlabel("Time")
-    plt.ylabel("Velocity")
-    plt.title("Velocity vs Time")
-    plt.legend(["X", "Y", "Z"])
-    plt.show()
+    axs[1,1].plot(velocities)
+    axs[1,1].set_xlabel("Time")
+    axs[1,1].set_ylabel("Velocity")
+    axs[1,1].set_title("Velocity vs Time")
+    axs[1,1].legend(["X", "Y", "Z"])
     
 
     # Plot the spring force over time
     spring_force = [solution.value(optimizer.robot_model.spring_force[k]) for k in range(optimizer.config.num_steps)]
     spring_force = np.array(spring_force)
-    plt.plot(spring_force)
-    plt.xlabel("Time")
-    plt.ylabel("Spring Force")
-    plt.title("Spring Force vs Time")
-    plt.legend(["Force"])
-    plt.show()
+    axs[2,0].plot(spring_force)
+    axs[2,0].set_xlabel("Time")
+    axs[2,0].set_ylabel("Spring Force")
+    axs[2,0].set_title("Spring Force vs Time")
+    axs[2,0].legend(["Force"])
 
     # Plot the spring elongation
     spring_elongation = [solution.value(optimizer.robot_model.spring_elongation[k]) for k in range(optimizer.config.num_steps+1)]
     spring_elongation = np.array(spring_elongation)
-    plt.plot(spring_elongation)
-    plt.xlabel("Time")
-    plt.ylabel("Spring Elongation")
+    axs[2,1].plot(spring_elongation)
+    axs[2,1].set_xlabel("Time")
+    axs[2,1].set_ylabel("Spring Elongation")
+
+    plt.tight_layout()
     plt.show()
 
-    # # Plot the SDF of the contact points over time
-    # sdf = [solution.value(optimizer.robot_model.sdf_value[k]) for k in range(optimizer.config.num_steps+1)]
-    # sdf = np.array(sdf)
-    # plt.plot(sdf)
-    # plt.xlabel("Time")
-    # plt.ylabel("SDF")
-    # plt.show()
+    fig, axs = plt.subplots(2,2, figsize=(15,15))
 
-    # # Plot the velocity over time
-    # velocities = [solution.value(optimizer.robot_model.velocity_world[k]) for k in range(optimizer.config.num_steps+1)]
-    # velocities = np.array(velocities)
-    # positions = np.array(positions)
-    # plt.plot(positions[:, 2])
-    # plt.plot(velocities)
-    # plt.xlabel("Time")
-    # plt.ylabel("Velocity")
-    # plt.legend(["Position", "Velocity"])
-    # plt.show()
+    # Plot the friction force over time
+    friction_impulse = [solution.value(optimizer.robot_model.friction_impulse[k]) for k in range(optimizer.config.num_steps)]
+    friction_impulse = np.array(friction_impulse)
+    axs[0,0].plot(friction_impulse)
+    axs[0,0].set_xlabel("Time")
+    axs[0,0].set_ylabel("Friction Impulse")
+    axs[0,0].set_title("Friction Impulse vs Time")
+    axs[0,0].legend(["X", "Y", "Z"])
 
-    # # Plot the contact force over time
-    # contact_force = [solution.value(optimizer.robot_model.spring_force[k]) for k in range(optimizer.config.num_steps+1)]
-    # contact_force = np.array(contact_force)
-    # plt.plot(contact_force)
-    # plt.xlabel("Time")
-    # plt.ylabel("Spring Force")
-    # plt.show()
+    # Plot the friction impulse over time
+    contact_force = [solution.value(optimizer.robot_model.contact_force_world[k]) for k in range(optimizer.config.num_steps)]
+    contact_force = np.array(contact_force)
+    axs[0,1].plot(contact_force)
+    axs[0,1].set_xlabel("Time")
+    axs[0,1].set_ylabel("Contact Force")
+    axs[0,1].set_title("Contact Force vs Time")
+    axs[0,1].legend(["X", "Y", "Z"])
 
-    # # Plot the contact force, control force, gravity, and acceleration over time
-    # # on one plot
-    # gravity = np.array([-9.81]*(optimizer.config.num_steps+1))
-    # acceleration = gravity + control_forces + contact_force
-    # plt.plot(contact_force)
-    # plt.plot(control_forces)
-    # plt.plot(acceleration)
-    # plt.plot(sdf)
-    # plt.xlabel("Time")
-    # plt.ylabel("Force")
-    # plt.legend(["Contact Force", "Control Force", "Acceleration", "SDF"])
-    # plt.show()
+    # Plot the contact moment over time
+    contact_moment = [solution.value(optimizer.robot_model.contact_moment_body[k]) for k in range(optimizer.config.num_steps)]
+    contact_moment = np.array(contact_moment)
+    axs[1,0].plot(contact_moment)
+    axs[1,0].set_xlabel("Time")
+    axs[1,0].set_ylabel("Contact Moment")
+    axs[1,0].set_title("Contact Moment vs Time")
+    axs[1,0].legend(["X", "Y", "Z"])
 
-    # # # Plot the spring elongation over time
-    # # spring_elongation = [solution.value(optimizer.robot_model.spring_elongation[k]) for k in range(optimizer.config.num_steps)]
-    # # spring_elongation = np.array(spring_elongation)
-    # # plt.plot(spring_elongation)
-    # # plt.xlabel("Time")
-    # # plt.ylabel("Spring Elongation")
-    # # plt.show()
+    plt.tight_layout()
+    plt.show()

@@ -10,7 +10,6 @@ import liecasadi as lca
 from traj_opt.models.robot_base.model import RobotBase
 from traj_opt.models.terrain.base import TerrainBase
 from traj_opt.models.hopping_softfly.constants import *
-from traj_opt.models.hopping_softfly.utils import sigmoid
 
 
 class HoppingSoftfly(RobotBase):
@@ -35,7 +34,7 @@ class HoppingSoftfly(RobotBase):
         self.setup_spring_dynamics()
 
         # Setup the contact constraints
-        self.setup_contact_constraints()
+        self.setup_contact_dynamics()
 
         # Setup the rigid body dynamics
         self.setup_rigid_body_dynamics()
@@ -67,21 +66,25 @@ class HoppingSoftfly(RobotBase):
         self.control_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
         self.control_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
 
-        # Contact force
-        self.contact_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
-
         # Spring force
         self.spring_force       = [self.optimizer.solver.variable() for _ in range(self.N+1)]
 
+        # Contact forces + moment
+        self.friction_impulse    = [self.optimizer.solver.variable(3)  for _ in range(self.N+1)]
+        self.contact_force_world = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+        self.contact_moment_body = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+
+        # Signed-distance-field value at contact point
+        self.sdf_value      = [self.optimizer.solver.variable() for _ in range(self.N+1)]
+
         # Surface normal at contact point
-        self.cos_theta      = [self.optimizer.solver.variable() for _ in range(self.N+1)]
         self.surface_normal = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
-        self.sdf_value      = [self.optimizer.solver.variable(2) for _ in range(self.N+1)]
 
-        # Contact point locations in world frame
+        # Contact point location + velocity in world frame
         self.contact_point_location = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
+        self.contact_point_velocity = [self.optimizer.solver.variable(3) for _ in range(self.N+1)]
 
-        # Gravity force = m*g
+        # Gravity force = m*g (constant)
         self.gravity = ca.vertcat(0, 0, -BODY_MASS_KG*GRAVITY_M_S2)
 
         # Total force acting on body w.r.t. world frame
@@ -130,54 +133,47 @@ class HoppingSoftfly(RobotBase):
         """
         Setup the spring dynamics for the optimization problem.
 
-        Solves for the spring force in terms of the elongation.
+        Constrains the spring elongation and defines the spring force 
+        in terms of the elongation.
         """
         for k in range(self.N+1):
-            R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
-
-            # Compute the cosine of the angle between the surface normal and the body z-axis
-            self.optimizer.solver.subject_to(
-                self.cos_theta[k] ==
-                ca.dot(self.surface_normal[k], R_body_to_world @ ca.vertcat(0, 0, 1)),
-            )
-            
-            # Spring is compressed when contacting and otherwise has no elongation
-            # This discontinuity is approximated using a sigmoid function
-            constraint_val = (
-                (self.position_world[k][2] - ORIGINAL_SPRING_LENGTH_M*self.cos_theta[k])
-            )
-            self.optimizer.solver.subject_to(
-                self.spring_elongation[k]*self.cos_theta[k] == (
-                    constraint_val
-                    * (1 - sigmoid(constraint_val, SIGMOID_STEEPNESS))
-                )
-            )
-            
             # The spring cannot be compressed beyond its original length
             self.optimizer.solver.subject_to(
                 self.spring_elongation[k] >= -ORIGINAL_SPRING_LENGTH_M
             )
-            # Prevent inversions of the drone, this leads to a negative cosine which can cause issues
-            self.optimizer.solver.subject_to(
-                self.cos_theta[k] >= 0
-            )
         
-        for k in range(self.N):
             # Compute the spring force
             self.optimizer.solver.subject_to(
-                self.spring_force[k+1] == - SPRING_CONSTANT_N_M * self.spring_elongation[k]
+                self.spring_force[k] == - SPRING_CONSTANT_N_M * self.spring_elongation[k]
+            )
+
+            # Spring force can only be nonzero if in contact with the ground
+            self.optimizer.solver.subject_to(
+                self.spring_force[k]*self.sdf_value[k] == 0
             )
         
-    def setup_contact_constraints(self):
+    def setup_contact_dynamics(self):
         """
-        Sets up the contact constraints for the optimization problem:
-            1. Non-penetration constraint
-            2. Contact force always positive
+        Sets up the contact dynamics for the optimization problem
+
+        These include:
+            - Contact point location in terms of drone position and spring elongation
+            - SDF value at contact point
+            - Surface normal at contact point
+            - Non-penetration constraint (SDF > 0)
+            - Contact Force:
+                - Always positive
+                - Equal to spring force plus friction impulse
+                - Friction immpulse has no normal component and lies within the friction cone
+                - Friction impulse is zero if not in contact
+            - Contact moment:
+                - Equal to contact position x contact force (in body frame)
         """
         for k in range(self.N+1):
             # Contact point location
             # p_contact = p_drone - R_b^w @ [0, 0, l + d]
             R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
+
             self.optimizer.solver.subject_to(
                 self.contact_point_location[k] == (
                     self.position_world[k] + 
@@ -187,19 +183,68 @@ class HoppingSoftfly(RobotBase):
                 )
             )
 
-            # Surface normal at contact point
-            self.optimizer.solver.subject_to(
-                self.surface_normal[k] == self.terrain.normal_vector(self.contact_point_location[k])
-            )
-
             # Signed distance function value
             self.optimizer.solver.subject_to(
                 self.sdf_value[k] == self.terrain.sdf(self.contact_point_location[k])
             )
 
-            # The contact force in the world frame is the spring force in the world frame
+            # Surface normal at contact point
             self.optimizer.solver.subject_to(
-                self.contact_force_world[k] == R_body_to_world @ ca.vertcat(0, 0, self.spring_force[k])
+                self.surface_normal[k] == self.terrain.normal_vector(self.contact_point_location[k])
+            )
+
+            # Non-penetration constraint
+            self.optimizer.solver.subject_to(
+                self.sdf_value[k] >= 0
+            )
+
+            # Contact force normal always positive
+            # NOTE: This relies on ground being a flat plane at z=0
+            # Contact force SHOULD be defined relative to the surface frame
+            self.optimizer.solver.subject_to(
+                self.contact_force_world[k][2] >= 0
+            )
+
+            # Friction impulse lies within the friction cone
+            # NOTE: World frame v.s. surface frame
+            self.optimizer.solver.subject_to(
+                self.friction_impulse[k][2] == 0
+            )
+            self.optimizer.solver.subject_to(
+                (self.friction_impulse[k][0]**2 + self.friction_impulse[k][1]**2) 
+                <= (self.contact_force_world[k][2]*FRICTION_COEFFICIENT)**2
+            )
+
+            # Complimentary constraint on friction impulse
+            # NOTE: World frame v.s. surface frame
+            self.optimizer.solver.subject_to(
+                self.friction_impulse[k]*self.sdf_value[k] == 0
+            )
+
+            # Complimentary constraint for no slip condition
+            self.optimizer.solver.subject_to(
+                (self.contact_point_velocity[k][0]**2 + self.contact_point_velocity[k][1]**2)
+                * self.contact_force_world[k][2] == 0
+            )
+
+            # Contact force is spring force plus friction impulse
+            R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
+            spring_force_world = R_body_to_world @ ca.vertcat(0, 0, self.spring_force[k])
+
+            self.optimizer.solver.subject_to(
+                self.contact_force_world[k] == spring_force_world + self.friction_impulse[k]
+            )
+
+            # Contact moment is r x contact force
+            R_world_to_body = lca.SO3(self.q_body_to_world[k]).inverse().as_matrix()
+            contact_force_body = R_world_to_body @ self.contact_force_world[k]
+            contact_point_body = ca.vertcat(
+                0, 0, -ORIGINAL_SPRING_LENGTH_M - self.spring_elongation[k]
+            )
+            self.optimizer.solver.subject_to(
+                self.contact_moment_body[k] == ca.cross(
+                    contact_point_body, contact_force_body
+                )
             )
 
     def setup_rigid_body_dynamics(self):
@@ -212,12 +257,18 @@ class HoppingSoftfly(RobotBase):
             - angular velocity -> orientation
 
             - total force -> velocity
-                - total force consists of control force, gravity, and contact force
+                - total force consists of control force, gravity, and total contact force
 
             - total moment -> angular velocity
-                - total moment consists of control moment
+                - total moment consists of control moment and total contact moment
         """
         for k in range(self.N):
+            # Integrate contact point velocity
+            self.optimizer.solver.subject_to(
+               self.dt*self.contact_point_velocity[k+1] == 
+               (self.contact_point_location[k+1] - self.contact_point_location[k])
+            ) 
+
             # Integrate velocity to get position
             self.optimizer.solver.subject_to(
                 (self.position_world[k+1] - self.position_world[k])
@@ -246,7 +297,7 @@ class HoppingSoftfly(RobotBase):
 
             # Compute total moment acting on the body w.r.t. the body frame
             # NOTE: Do not transform to world frame b/c angular velocity is in body frame
-            total_moment = self.control_moment_body[k+1]
+            total_moment = self.control_moment_body[k+1] + self.contact_moment_body[k+1]
 
             # Integrate moment to get angular velocity
             self.optimizer.solver.subject_to(
@@ -268,7 +319,7 @@ class HoppingSoftfly(RobotBase):
             self.q_body_to_world[0] == ca.vertcat(*initial_state["q_body_to_world"])
         )
         self.optimizer.solver.subject_to(
-            self.velocity_world[0] <= ca.vertcat(*initial_state["velocity"])
+            self.velocity_world[0] == ca.vertcat(*initial_state["velocity"])
         )
         self.optimizer.solver.subject_to(
             self.angular_velocity_body[0] == ca.vertcat(*initial_state["angular_velocity_body"])
@@ -285,6 +336,9 @@ class HoppingSoftfly(RobotBase):
         )
         self.optimizer.solver.subject_to(
             self.velocity_world[-1] == ca.vertcat(*final_state["velocity"])
+        )
+        self.optimizer.solver.subject_to(
+            self.angular_velocity_body[-1] == ca.vertcat(*initial_state["angular_velocity_body"])
         )
 
     def setup_state_limits(self):
@@ -321,7 +375,6 @@ class HoppingSoftfly(RobotBase):
                 self.optimizer.solver.subject_to(
                     self.velocity_world[k][i] <= state_limits["velocity"][1]
                 )
-                
                 self.optimizer.solver.subject_to(
                     self.angular_velocity_body[k][i] >= state_limits["angular_velocity_body"][0]
                 )

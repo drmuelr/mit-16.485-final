@@ -14,21 +14,21 @@ class TrajOptConfig:
     The name of the file to save the solution to.
     """
     
-    initial_guess_path: str = ""
+    initial_guess_path: str = "results/hopper/jump_1m_x.npz"
     """
     The name of the .npz file to load the initial guess from.
 
     If no file is found, no initial guess is used.
     """
 
-    robot_class: type[RobotBase] = Softfly
+    robot_class: type[RobotBase] = HoppingSoftfly
     """
     The name of the robot model being used for optimization.
     """
 
     initial_state: dict[str, float | list[float]] = {
-        "position": [0.0, 0.0, 1.0],
-        "velocity": [0.0, 0.0, 0.0],
+        "position": [0.0, 0.0, 0.5],
+        "velocity": [0.0, 0.0, -0.0],
         "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
         "angular_velocity_body": [0.0, 0.0, 0.0],
     }
@@ -37,7 +37,7 @@ class TrajOptConfig:
     """
 
     final_state: dict[str, float | list[float]] = {
-        "position": [1.0, 0.0, 1.0],
+        "position": [1.0, 0.0, 0.5],
         "velocity": [0.0, 0.0, 0.0],
         "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
         "angular_velocity_body": [0.0, 0.0, 0.0],
@@ -49,8 +49,8 @@ class TrajOptConfig:
     for the final state. This seems to help with convergence. Probably 
     """
 
-    cost_weights: dict[str, float] = {
-        'control_force': 1.0,
+    cost_weights: dict[str, float] =     {
+        'control_force': 100.0,
         'control_moment': 0.0,
         'contact_force': 0.0,
         'T': 1.0
@@ -74,11 +74,11 @@ class TrajOptConfig:
     """
 
     state_limits: dict[str, list[float]] = {
-        "position_X": [0.0, 1.0],
-        "position_Y": [-0.01, 0.01],
-        "position_Z": [0.0, 1.5],
+        "position_X": [0.0, 1.2],
+        "position_Y": [0.0, 0.0],
+        "position_Z": [0.0, 1.0],
         "velocity": [-20.0, 20.0],
-        "angular_velocity_body": [-50.0, 50.0],
+        "angular_velocity_body": [-30.0, 30.0],
     }
     """
     The limits for the state variables in the optimization problem.
@@ -106,7 +106,7 @@ class TrajOptConfig:
         - Available options: [FlatTerrain]
     """
 
-    max_time: float = 10.0
+    max_time: float = 5.0
     """
     The maximum time allowed to reach the final position from the initial position.
     """

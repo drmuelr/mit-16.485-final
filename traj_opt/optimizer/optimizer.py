@@ -63,13 +63,12 @@ class Optimizer:
             "expand": True
         }
         solver_options = {
-            "tol": 1e-3,                # Set convergence tolerance
+            "tol": 1e-4,                # Set convergence tolerance
             "max_iter": 100000,           # Increase iteration limit
             "mu_strategy": "adaptive",  # Dynamic barrier parameter adjustment
-            "nlp_scaling_method": "gradient-based",  # Enable scaling
-            "nlp_scaling_max_gradient": 100,
+            "nlp_scaling_method": "none",  # Enable scaling
             "derivative_test": "none",  # Disable derivative checker
-            "hessian_approximation": "limited-memory",  # Use L-BFGS for Hessian approximation
+            # "hessian_approximation": "limited-memory",  # Use L-BFGS for Hessian approximation
             "print_level": self.config.ipopt_print_level
         }
 
