@@ -174,12 +174,13 @@ class HoppingSoftfly(RobotBase):
             # p_contact = p_drone - R_b^w @ [0, 0, l + d]
             R_body_to_world = lca.SO3(self.q_body_to_world[k]).as_matrix()
 
+            contact_point_body = ca.vertcat(
+                0, 0, -ORIGINAL_SPRING_LENGTH_M - self.spring_elongation[k]
+            )
             self.optimizer.solver.subject_to(
                 self.contact_point_location[k] == (
                     self.position_world[k] + 
-                    R_body_to_world @ ca.vertcat (
-                        0, 0, -ORIGINAL_SPRING_LENGTH_M - self.spring_elongation[k]
-                    )
+                    R_body_to_world @ contact_point_body
                 )
             )
 
@@ -198,33 +199,38 @@ class HoppingSoftfly(RobotBase):
                 self.sdf_value[k] >= 0
             )
 
-            # Contact force normal always positive
-            # NOTE: This relies on ground being a flat plane at z=0
-            # Contact force SHOULD be defined relative to the surface frame
+            # Contact force normal to surface is always positive
             self.optimizer.solver.subject_to(
-                self.contact_force_world[k][2] >= 0
+                ca.dot(
+                    self.contact_force_world[k], self.surface_normal[k]
+                ) >= 0
             )
 
             # Friction impulse lies within the friction cone
-            # NOTE: World frame v.s. surface frame
+            friction_impulse_normal = ca.dot(self.friction_impulse[k], self.surface_normal[k])
+            friction_impulse_tangent = (
+                self.friction_impulse[k] - (friction_impulse_normal*self.surface_normal[k])
+            )
+
             self.optimizer.solver.subject_to(
-                self.friction_impulse[k][2] == 0
+                friction_impulse_normal == 0
             )
             self.optimizer.solver.subject_to(
-                (self.friction_impulse[k][0]**2 + self.friction_impulse[k][1]**2) 
+                self.optimizer.norm_1(friction_impulse_tangent)
                 <= (self.contact_force_world[k][2]*FRICTION_COEFFICIENT)**2
             )
 
             # Complimentary constraint on friction impulse
-            # NOTE: World frame v.s. surface frame
             self.optimizer.solver.subject_to(
                 self.friction_impulse[k]*self.sdf_value[k] == 0
             )
 
             # Complimentary constraint for no slip condition
             self.optimizer.solver.subject_to(
-                (self.contact_point_velocity[k][0]**2 + self.contact_point_velocity[k][1]**2)
-                * self.contact_force_world[k][2] == 0
+                self.optimizer.norm_1(self.contact_point_velocity[k])
+                * ca.dot(
+                    self.contact_force_world[k], self.surface_normal[k]
+                ) == 0
             )
 
             # Contact force is spring force plus friction impulse
@@ -238,9 +244,6 @@ class HoppingSoftfly(RobotBase):
             # Contact moment is r x contact force
             R_world_to_body = lca.SO3(self.q_body_to_world[k]).inverse().as_matrix()
             contact_force_body = R_world_to_body @ self.contact_force_world[k]
-            contact_point_body = ca.vertcat(
-                0, 0, -ORIGINAL_SPRING_LENGTH_M - self.spring_elongation[k]
-            )
             self.optimizer.solver.subject_to(
                 self.contact_moment_body[k] == ca.cross(
                     contact_point_body, contact_force_body

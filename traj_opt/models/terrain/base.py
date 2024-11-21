@@ -22,3 +22,7 @@ class TerrainBase(ABC):
     @abstractmethod
     def normal_vector(self, position):
         pass
+
+    @abstractmethod
+    def plot_func(self, X, Y):
+        pass

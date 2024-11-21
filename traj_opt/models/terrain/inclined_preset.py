@@ -1,8 +1,11 @@
 import casadi as ca
+import math
 
 from traj_opt.models.terrain.base import TerrainBase
 
-class FlatTerrain(TerrainBase):
+INCLINE_ANGLE_DEG = 20
+
+class InclinedPlaneTerrain(TerrainBase):
     """
     The flat terrain preset. 
 
@@ -14,8 +17,11 @@ class FlatTerrain(TerrainBase):
         y_pos = ca.SX.sym('y_pos')
         z_pos = ca.SX.sym('z_pos')
 
-        # Define the signed distance function for flat terrain (z=0)
-        sdf_expr = z_pos  # Since it's flat at z=0, the SDF is just the z-coordinate
+        # Convert the incline angle to radians
+        self.theta = math.radians(INCLINE_ANGLE_DEG)
+
+        # Define the signed distance function for inclined plane terrain
+        sdf_expr = z_pos - ca.tan(self.theta) * x_pos 
         self.sdf_func = ca.Function('flat_sdf', [x_pos, y_pos, z_pos], [sdf_expr], ['x', 'y', 'z'], ['sdf'])
 
         # Calculate the gradient (Jacobian) of the sdf function
@@ -33,6 +39,6 @@ class FlatTerrain(TerrainBase):
         # Normalize the gradient to get a unit normal vector
         normal = gradient / ca.norm_2(gradient)
         return normal
-
+    
     def plot_func(self, X, Y):
-        return 0
+        return math.tan(self.theta)*X

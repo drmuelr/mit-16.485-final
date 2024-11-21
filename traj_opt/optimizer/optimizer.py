@@ -151,3 +151,12 @@ class Optimizer:
             self.solver.set_initial(self.robot_model.control_moment_body[k], init_guess["control_moment_body"][k])
             self.solver.set_initial(self.T, init_guess["T"])
             self.solver.set_initial(self.h, init_guess["h"])
+
+    def norm_1(self, vec):
+        """
+        Return the L1 norm of a casadi vector.
+
+        Use this instead of ca.norm_2/ca.norm_1, which seem to cause numerical issues
+        (INVALID NUMBER ERROR from IPOPT).
+        """
+        return vec[0]**2 + vec[1]**2 + vec[2]**2

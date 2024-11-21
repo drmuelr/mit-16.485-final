@@ -42,7 +42,7 @@ def animate_solution(optimizer, solution):
     x_plane = np.linspace(pos_array[:, 0].min() - 1, pos_array[:, 0].max() + 1, 10)
     y_plane = np.linspace(pos_array[:, 1].min() - 1, pos_array[:, 1].max() + 1, 10)
     X, Y = np.meshgrid(x_plane, y_plane)
-    Z = np.zeros_like(X)  # Plane at z=0
+    Z = optimizer.terrain_model.plot_func(X, Y)
     ax.plot_surface(X, Y, Z, color="gray", alpha=0.5, rstride=100, cstride=100)
 
     # Function to update coordinate frame and position
