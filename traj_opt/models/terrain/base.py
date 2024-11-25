@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 
-import casadi as ca
-
 class TerrainBase(ABC):
     """
     Defines the interface for all terrain classes.

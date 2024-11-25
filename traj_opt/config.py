@@ -2,6 +2,7 @@ from traj_opt.models import (
     HoppingSoftfly,
     FlatTerrain,
     InclinedPlaneTerrain,
+    HillyTerrain,
     RobotBase,
     Softfly,
 )
@@ -17,7 +18,7 @@ class TrajOptConfig:
     The name of the file to save the solution to.
     """
     
-    initial_guess_path: str = "results/hopper/jump_1m_x_20deg.npz"
+    initial_guess_path: str = "results/hopper/sinusoid_big_jump.npz"
     """
     The name of the .npz file to load the initial guess from.
 
@@ -29,7 +30,7 @@ class TrajOptConfig:
     The name of the robot model being used for optimization.
     """
 
-    terrain_source: type[TerrainBase] = InclinedPlaneTerrain
+    terrain_source: type[TerrainBase] = HillyTerrain
     """
     The source of the terrain data.
 
@@ -37,12 +38,13 @@ class TrajOptConfig:
         - Available options: 
         [
             FlatTerrain,
-            InclinedPlaneTerrain
+            InclinedPlaneTerrain,
+            HillyTerrain
         ]
     """
 
     initial_state: dict[str, float | list[float]] = {
-        "position": [0.0, 0.0, 0.5],
+        "position": [0.0, 0.0, 2.5],
         "velocity": [0.0, 0.0, 0.0],
         "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
         "angular_velocity_body": [0.0, 0.0, 0.0],
@@ -52,7 +54,7 @@ class TrajOptConfig:
     """
 
     final_state: dict[str, float | list[float]] = {
-        "position": [1.0, 0.0, 0.5*(1+math.tan(math.radians(20)))],
+        "position": [2*math.pi, 0.0, 2.5],
         "velocity": [0.0, 0.0, 0.0],
         "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
         "angular_velocity_body": [0.0, 0.0, 0.0],
@@ -61,11 +63,11 @@ class TrajOptConfig:
     The final state of the robot.
     """
 
-    cost_weights: dict[str, float] =     {
+    cost_weights: dict[str, float] =    {
         'control_force': 100.0,
         'control_moment': 0.0,
         'contact_force': 0.0,
-        'T': 0.001
+        'T': 0.00001
     }
     """
     Cost function weights for the optimization problem.
@@ -86,9 +88,9 @@ class TrajOptConfig:
     """
 
     state_limits: dict[str, list[float]] = {
-        "position_X": [0.0, 1.2],
-        "position_Y": [0.0, 0.0],
-        "position_Z": [0.0, 1.0],
+        "position_X": [0, 2.5*math.pi],
+        "position_Y": [-0.5, 0.5],
+        "position_Z": [-1.0, 3.5],
         "velocity": [-20.0, 20.0],
         "angular_velocity_body": [-30.0, 30.0],
     }
@@ -110,7 +112,7 @@ class TrajOptConfig:
     h = T / num_steps
     """
 
-    max_time: float = 5.0
+    max_time: float = 10.0
     """
     The maximum time allowed to reach the final position from the initial position.
     """

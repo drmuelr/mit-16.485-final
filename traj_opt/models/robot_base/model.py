@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 
 from abc import ABC, abstractmethod
 
-from casadi import MX, SX
+from casadi import MX
 
 from traj_opt.models.terrain.base import TerrainBase
 

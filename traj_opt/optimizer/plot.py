@@ -32,18 +32,19 @@ def animate_solution(optimizer, solution):
     # Line from position to contact point
     (contact_line,) = ax.plot([0, 0], [0, 0], [0, 0], "purple")
 
-    # Set plot limits based on data range
-    pos_array = np.array(positions)
-    ax.set_xlim([pos_array[:, 0].min() - 1, pos_array[:, 0].max() + 1])
-    ax.set_ylim([pos_array[:, 1].min() - 1, pos_array[:, 1].max() + 1])
-    ax.set_zlim([pos_array[:, 2].min() - 1, pos_array[:, 2].max() + 1])
-
+    # Set plot limits based on biggest max and smallest min
+    state_lims = optimizer.config.state_limits
+    xmin = state_lims["position_X"][0] - 2
+    xmax = state_lims["position_X"][1] + 2
+    ymin = state_lims["position_Y"][0] - 2
+    ymax = state_lims["position_Y"][1] + 2
+    
     # Plot a plane at z=0
-    x_plane = np.linspace(pos_array[:, 0].min() - 1, pos_array[:, 0].max() + 1, 10)
-    y_plane = np.linspace(pos_array[:, 1].min() - 1, pos_array[:, 1].max() + 1, 10)
-    X, Y = np.meshgrid(x_plane, y_plane)
+    x_surf = np.linspace(xmin, xmax, 100)
+    y_surf = np.linspace(ymin, ymax, 100)
+    X, Y = np.meshgrid(x_surf, y_surf)
     Z = optimizer.terrain_model.plot_func(X, Y)
-    ax.plot_surface(X, Y, Z, color="gray", alpha=0.5, rstride=100, cstride=100)
+    ax.plot_surface(X, Y, Z, color="gray", alpha=1.0)
 
     # Function to update coordinate frame and position
     def update_frame(i):
