@@ -31,13 +31,21 @@ class Optimizer:
 
         # Initialize the terrain model
         self.is_mesh_terrain = isinstance(config.terrain_source, str)
+        print(
+            "Initializing terrain from source: ", 
+              config.terrain_source if self.is_mesh_terrain
+              else config.terrain_source.__name__ + " (preset)"
+            )
         self.terrain_model = (
             MeshLoader(config.terrain_source) if self.is_mesh_terrain
             else config.terrain_source() 
         )
+        print("Finished initializing terrain!")
 
         # Initialize the robot model
+        print("Initializing robot model: ", config.robot_class.__name__)
         self.robot_model = config.robot_class(self, self.terrain_model)
+        print("Finished initializing robot model!")
 
         # Load the initial guess
         self.load_initial_guess()
@@ -143,8 +151,8 @@ class Optimizer:
             init_guess = np.load(init_guess_path)
             print("Loaded initial guess from:", init_guess_path)
 
-        except Exception as e:
-            print(f"No initial guess found at {init_guess_path}:", e)
+        except Exception:
+            print(f"No initial guess found at {init_guess_path}")
             return
 
         for k in range(self.config.num_steps + 1):
