@@ -13,16 +13,19 @@ def animate_solution(optimizer, solution):
     positions = [solution.value(optimizer.robot_model.position_world[k]) for k in range(optimizer.config.num_steps + 1)]
     quaternions = [solution.value(optimizer.robot_model.q_body_to_world[k]) for k in range(optimizer.config.num_steps + 1)]
 
+    #drone shape
+    drone_body = np.array([
+        [1, 0, 0],    # Front propeller
+        [0, 1, 0],    # Right propeller
+        [-1, 0, 0],   # Rear propeller
+        [0, -1, 0],   # Left propeller
+    ])
+
     contact_point_location = [solution.value(optimizer.robot_model.contact_point_location[k]) for k in range(optimizer.config.num_steps+1)]
 
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
     ax.set_box_aspect([1, 1, 1])
-
-    scaling_factor = 0.5
-    x_cords = scaling_factor * np.array([1, 0, 0])
-    y_cords = scaling_factor * np.array([0, 1, 0])
-    z_cords = scaling_factor * np.array([0, 0, 1])
 
     # Plot initial frame
     (x_line,) = ax.plot([0, 1], [0, 0], [0, 0], "red")
@@ -31,6 +34,10 @@ def animate_solution(optimizer, solution):
 
     # Line from position to contact point
     (contact_line,) = ax.plot([0, 0], [0, 0], [0, 0], "purple")
+
+    # Initialize lines for each drone arm
+    (drone_arm1,) = ax.plot([], [], [], 'o-', color="blue", markersize=6, label="Drone Arm 1")
+    (drone_arm2,) = ax.plot([], [], [], 'o-', color="blue", markersize=6, label="Drone Arm 2")
 
     # Set plot limits based on biggest max and smallest min
     state_lims = optimizer.config.state_limits
@@ -43,7 +50,11 @@ def animate_solution(optimizer, solution):
     x_surf = np.linspace(xmin, xmax, 100)
     y_surf = np.linspace(ymin, ymax, 100)
     X, Y = np.meshgrid(x_surf, y_surf)
-    Z = optimizer.terrain_model.plot_func(X, Y)
+    # Vectorize the terrain function
+    plot_func_vectorized = np.vectorize(optimizer.terrain_model.plot_func)
+    # Apply the function over the grid
+    Z = plot_func_vectorized(X, Y)
+    # Z = optimizer.terrain_model.plot_func(X, Y)
     ax.plot_surface(X, Y, Z, color="gray", alpha=1.0)
 
     # Function to update coordinate frame and position
@@ -53,24 +64,31 @@ def animate_solution(optimizer, solution):
 
         contact_point = contact_point_location[i]
 
-        x_end = pos_i + rotation @ x_cords
-        y_end = pos_i + rotation @ y_cords
-        z_end = pos_i + rotation @ z_cords
-
-        x_line.set_data([pos_i[0], x_end[0]], [pos_i[1], x_end[1]])
-        x_line.set_3d_properties([pos_i[2], x_end[2]])
-
-        y_line.set_data([pos_i[0], y_end[0]], [pos_i[1], y_end[1]])
-        y_line.set_3d_properties([pos_i[2], y_end[2]])
-
-        z_line.set_data([pos_i[0], z_end[0]], [pos_i[1], z_end[1]])
-        z_line.set_3d_properties([pos_i[2], z_end[2]])
-
         # Update contact line
         contact_line.set_data([pos_i[0], contact_point[0]], [pos_i[1], contact_point[1]])
         contact_line.set_3d_properties([pos_i[2], contact_point[2]])
 
-        return x_line, y_line, z_line, contact_line
+        # Rotate and translate the drone body
+        rotated_drone_body = (rotation @ drone_body.T).T + pos_i
+
+        # Update the drone arms
+        drone_arm1.set_data(
+            [rotated_drone_body[0, 0], rotated_drone_body[2, 0]],
+            [rotated_drone_body[0, 1], rotated_drone_body[2, 1]],
+        )
+        drone_arm1.set_3d_properties(
+            [rotated_drone_body[0, 2], rotated_drone_body[2, 2]]
+        )
+
+        drone_arm2.set_data(
+            [rotated_drone_body[1, 0], rotated_drone_body[3, 0]],
+            [rotated_drone_body[1, 1], rotated_drone_body[3, 1]],
+        )
+        drone_arm2.set_3d_properties(
+            [rotated_drone_body[1, 2], rotated_drone_body[3, 2]]
+        )
+
+        return x_line, y_line, z_line, contact_line, drone_arm1, drone_arm2
 
     # Create the animation
     fps = 1 / solution.value(optimizer.h) / 2
