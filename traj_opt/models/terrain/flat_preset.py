@@ -35,4 +35,4 @@ class FlatTerrain(TerrainBase):
         return normal
 
     def plot_func(self, X, Y):
-        return 0
+        return 0*X

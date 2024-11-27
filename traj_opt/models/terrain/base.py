@@ -9,8 +9,8 @@ class TerrainBase(ABC):
         - sdf(): which returns the signed distance function of the terrain as
             a casadi Function given an (x, y, z) point as input.
 
-        - sdf_jacob():  returns the jacobian of the signed distance function 
-            as a casadi Function given an (x, y, z) point as input.
+        - normal_vector():  returns the normal vector of the surface at a given
+            (x, y, z) point on the terrain.
     """
 
     @abstractmethod
@@ -19,8 +19,4 @@ class TerrainBase(ABC):
 
     @abstractmethod
     def normal_vector(self, position):
-        pass
-
-    @abstractmethod
-    def plot_func(self, X, Y):
         pass

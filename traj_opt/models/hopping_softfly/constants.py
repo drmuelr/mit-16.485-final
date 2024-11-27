@@ -1,6 +1,6 @@
 import casadi as ca
 
-ORIGINAL_SPRING_LENGTH_M = 0.5
+ORIGINAL_SPRING_LENGTH_M = 0.42
 """
 The length of the spring when it is at rest [m].
 """
@@ -25,7 +25,7 @@ BODY_MASS_KG = 1.0
 Total mass of body [kg].
 """
 
-ARM_LENGTH_M = 0.5
+ARM_LENGTH_M = 0.2
 """
 Length of arm connecting the body to each wing [m].
 """

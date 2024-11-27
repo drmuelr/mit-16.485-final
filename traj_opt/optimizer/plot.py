@@ -25,7 +25,6 @@ def animate_solution(optimizer, solution):
 
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
-    ax.set_box_aspect([1, 1, 1])
 
     # Plot initial frame
     (x_line,) = ax.plot([0, 1], [0, 0], [0, 0], "red")
@@ -45,17 +44,34 @@ def animate_solution(optimizer, solution):
     xmax = state_lims["position_X"][1] + 2
     ymin = state_lims["position_Y"][0] - 2
     ymax = state_lims["position_Y"][1] + 2
+    zmin = state_lims["position_Z"][0] - 2
+    zmax = state_lims["position_Z"][1] + 2
     
-    # Plot a plane at z=0
-    x_surf = np.linspace(xmin, xmax, 100)
-    y_surf = np.linspace(ymin, ymax, 100)
-    X, Y = np.meshgrid(x_surf, y_surf)
-    # Vectorize the terrain function
-    plot_func_vectorized = np.vectorize(optimizer.terrain_model.plot_func)
-    # Apply the function over the grid
-    Z = plot_func_vectorized(X, Y)
-    # Z = optimizer.terrain_model.plot_func(X, Y)
-    ax.plot_surface(X, Y, Z, color="gray", alpha=1.0)
+    if not optimizer.is_mesh_terrain: 
+        x_surf = np.linspace(xmin, xmax, 100)
+        y_surf = np.linspace(ymin, ymax, 100)
+        X, Y = np.meshgrid(x_surf, y_surf)
+        # Vectorize the terrain function
+        plot_func_vectorized = np.vectorize(optimizer.terrain_model.plot_func)
+        # Apply the function over the grid
+        Z = plot_func_vectorized(X, Y)
+        # Z = optimizer.terrain_model.plot_func(X, Y)
+        ax.plot_surface(X, Y, Z, color="gray", alpha=1.0)
+    else:
+        mesh = optimizer.terrain_model.mesh
+        ax.plot_trisurf(
+            mesh.vertices[:, 0], 
+            mesh.vertices[:,1], 
+            triangles=mesh.faces, 
+            Z=mesh.vertices[:,2]
+        ) 
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_zlim(zmin, zmax)
+
+    ax.set_proj_type('ortho')
+    ax.set_aspect('equal')
 
     # Function to update coordinate frame and position
     def update_frame(i):

@@ -6,6 +6,7 @@ import numpy as np
 from traj_opt.optimizer.plot import animate_solution
 
 from traj_opt.config import TrajOptConfig
+from traj_opt.models import MeshLoader
 
 
 class Optimizer:
@@ -29,7 +30,11 @@ class Optimizer:
         self.setup_free_time()
 
         # Initialize the terrain model
-        self.terrain_model = config.terrain_source()
+        self.is_mesh_terrain = isinstance(config.terrain_source, str)
+        self.terrain_model = (
+            MeshLoader(config.terrain_source) if self.is_mesh_terrain
+            else config.terrain_source() 
+        )
 
         # Initialize the robot model
         self.robot_model = config.robot_class(self, self.terrain_model)
@@ -60,7 +65,7 @@ class Optimizer:
         # Solve the optimization problem
 
         plugin_opts = {
-            "expand": True
+            "expand": not self.is_mesh_terrain
         }
         solver_options = {
             "tol": 1e-4,                # Set convergence tolerance
