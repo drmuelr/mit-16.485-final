@@ -393,7 +393,7 @@ class HoppingSoftfly(RobotBase):
         """
         cost_weights = self.optimizer.config.cost_weights        
 
-        cost = self.optimizer.T/self.optimizer.config.max_time * cost_weights["T"]
+        cost = self.optimizer.T/self.optimizer.config.max_time_s * cost_weights["T"]
 
         for k in range(self.N+1):
             cost += (

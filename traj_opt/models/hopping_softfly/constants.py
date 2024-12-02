@@ -25,7 +25,7 @@ BODY_MASS_KG = 1.0
 Total mass of body [kg].
 """
 
-ARM_LENGTH_M = 0.2
+ARM_LENGTH_M = 0.5
 """
 Length of arm connecting the body to each wing [m].
 """

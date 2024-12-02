@@ -29,7 +29,7 @@ def animate_solution(optimizer, solution):
     # Plot initial frame
     (x_line,) = ax.plot([0, 1], [0, 0], [0, 0], "red")
     (y_line,) = ax.plot([0, 0], [0, 1], [0, 0], "green")
-    (z_line,) = ax.plot([0, 0], [0, 0], [1], "blue")
+    (z_line,) = ax.plot([0, 0], [0, 0], [0, 1], "blue")
 
     # Line from position to contact point
     (contact_line,) = ax.plot([0, 0], [0, 0], [0, 0], "purple")

@@ -5,7 +5,7 @@ import numpy as np
 
 from traj_opt.optimizer.plot import animate_solution
 
-from traj_opt.config import TrajOptConfig
+from configs import TrajOptConfig
 from traj_opt.models import MeshLoader
 
 
@@ -64,7 +64,7 @@ class Optimizer:
         self.solver.subject_to(self.h == self.T / self.config.num_steps)
 
         self.solver.subject_to(self.T > 0.01)
-        self.solver.subject_to(self.T < self.config.max_time)
+        self.solver.subject_to(self.T < self.config.max_time_s)
 
     def solve(self):
         """

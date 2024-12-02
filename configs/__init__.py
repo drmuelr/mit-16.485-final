@@ -1,36 +1,66 @@
+import importlib.util
+from pathlib import Path
+from pydantic import BaseModel
+
 from traj_opt.models import (
-    HoppingSoftfly,
-    FlatTerrain,
-    InclinedPlaneTerrain,
-    HillyTerrain,
     RobotBase,
-    Softfly,
+    TerrainBase
 )
-from traj_opt.models.terrain.base import TerrainBase
 
-import math
+def load_config(file_name: str):
+    """
+    Dynamically load the `config` object from a Python file.
+
+    Parameters
+    ----------
+    file_name : str
+        The name or path of the Python config file to import from.
+
+    Returns
+    -------
+    config : TrajOptConfig
+        The `config` object from the specified file.
+
+    """
+    # Ensure the file exists
+    file_path = Path(file_name)
+    if not file_path.is_file():
+        raise FileNotFoundError(f"The file {file_name} does not exist.")
+    
+    # Load the module from the specified file
+    module_name = file_path.stem  # Extract module name from file (without extension)
+    spec = importlib.util.spec_from_file_location(module_name, file_name)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    # Retrieve the `config` object from the module
+    if not hasattr(module, "config"):
+        raise AttributeError(f"The module {module_name} does not contain a 'config' object.")
+    
+    return module.config
 
 
-class TrajOptConfig:
 
-    save_solution_as: str = "results/solution.npz"
+class TrajOptConfig(BaseModel):
+
+    save_solution_as: str
     """
     The name of the file to save the solution to.
     """
     
-    initial_guess_path: str = "results/hopper/none.npz"
+    initial_guess_path: str
     """
     The name of the .npz file to load the initial guess from.
 
     If no file is found, no initial guess is used.
     """
 
-    robot_class: type[RobotBase] = HoppingSoftfly
+    robot_class: type[RobotBase]
     """
     The name of the robot model being used for optimization.
     """
 
-    terrain_source: type[TerrainBase] = "meshes/mountains.obj"
+    terrain_source: type[TerrainBase] | str
     """
     The source of the terrain data, which can be a preset class
     or a path to a '.obj' mesh file.
@@ -43,32 +73,17 @@ class TrajOptConfig:
         ]
     """
 
-    initial_state: dict[str, float | list[float]] = {
-        "position": [-15, 0.0, 13.0],
-        "velocity": [0.0, 0.0, 0.0],
-        "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
-        "angular_velocity_body": [0.0, 0.0, 0.0],
-    }
+    initial_state: dict[str, float | list[float]]
     """
     The initial state of the robot.
     """
 
-    final_state: dict[str, float | list[float]] = {
-        "position": [-15, 0.0, 13.0],
-        "velocity": [0.0, 0.0, 0.0],
-        "q_body_to_world": [0.0, 0.0, 0.0, 1.0], # World2Body (x, y, z, w)
-        "angular_velocity_body": [0.0, 0.0, 0.0],
-    }
+    final_state: dict[str, float | list[float]]
     """
     The final state of the robot.
     """
 
-    cost_weights: dict[str, float] =    {
-        'control_force': 0.0,
-        'control_moment': 0.0,
-        'contact_force': 0.0,
-        'T': 1.0
-    }
+    cost_weights: dict[str, float]
     """
     Cost function weights for the optimization problem.
     Keys correspond with casadi variable names defined in the model.
@@ -87,13 +102,7 @@ class TrajOptConfig:
     throw off the solver too much. 
     """
 
-    state_limits: dict[str, list[float]] = {
-        "position_X": [-50, 50],
-        "position_Y": [-0.5, 0.5],
-        "position_Z": [-50.0, 50],
-        "velocity": [-20.0, 20.0],
-        "angular_velocity_body": [-30.0, 30.0],
-    }
+    state_limits: dict[str, list[float]]
     """
     The limits for the state variables in the optimization problem.
 
@@ -103,7 +112,7 @@ class TrajOptConfig:
     initial guess.
     """
 
-    num_steps: int = 100
+    num_steps: int
     """
     The number of steps that the trajectory is discretely broken into.
 
@@ -112,12 +121,12 @@ class TrajOptConfig:
     h = T / num_steps
     """
 
-    max_time: float = 5
+    max_time_s: float
     """
-    The maximum time allowed to reach the final position from the initial position.
+    The maximum time in seconds allowed to reach the final position from the initial position.
     """
 
-    ipopt_print_level: int = 5
+    ipopt_print_level: int
     """
     The verbosity level of IPOPT solver output.
 
