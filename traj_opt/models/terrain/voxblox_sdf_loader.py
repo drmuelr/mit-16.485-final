@@ -38,20 +38,13 @@ class VoxbloxSdfLoader(TerrainBase):
         self.grid_sdf, self.grid_x, self.grid_y, self.grid_z = self.create_sdf_grid(points, distances)
         
         # Create casadi lookup table from regular grid
-        sdf_lut = ca.interpolant('SDF', 'linear', [x, y, z], self.grid_grid_sdf.flatten(order='F'))
+        sdf_lut = ca.interpolant(
+            'SDF', 'linear', [self.grid_x, self.grid_y, self.grid_z], self.grid_grid_sdf.flatten(order='F')
+        )
 
-        # Define symbolic variables using MX
-        x = ca.MX.sym('x')
-        y = ca.MX.sym('y')
-        z = ca.MX.sym('z')
-        sdf_expr = sdf_lut(ca.vertcat(x, y, z))
+        self.sdf_expr = sdf_lut(ca.vertcat(self.x, self.y, self.z))
 
-        # Define the SDF casadi function that operates on symbolic MX variables
-        self.sdf_func = ca.Function('mesh_sdf', [x, y, z], [sdf_expr], ['x', 'y', 'z'], ['sdf'])
-
-        # Calculate the gradient (Jacobian) of the sdf function
-        sdf_gradient = ca.jacobian(sdf_expr, ca.vertcat(x, y, z))
-        self.sdf_gradient_func = ca.Function('mesh_sdf_gradient', [x, y, z], [sdf_gradient], ['x', 'y', 'z'], ['gradient'])
+        super().__init__()
 
     def create_sdf_grid(self, points, distances):
         """
@@ -76,21 +69,6 @@ class VoxbloxSdfLoader(TerrainBase):
 
         return grid_sdf, x, y, z
 
-    def sdf(self, position):
-        """
-        Evaluate the SDF value at a given position.
-        """
-        return self.sdf_func(x=position[0], y=position[1], z=position[2])['sdf']
-
-    def normal_vector(self, position):
-        """
-        Evaluate the gradient of the SDF at the given position to compute the surface normal.
-        """
-        gradient = self.sdf_gradient_func(x=position[0], y=position[1], z=position[2])['gradient'].T
-
-        normal = gradient / ca.norm_2(gradient)  # Normalize to unit vector
-        return normal
-    
     def plot_zero_crossing(self, ax, threshold=0.05):
         """
         Plots the zero-crossing points of the interpolated SDF grid.
