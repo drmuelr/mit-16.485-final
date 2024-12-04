@@ -15,10 +15,10 @@ def animate_solution(optimizer, solution):
 
     #drone shape
     drone_body = np.array([
-        [1, 0, 0],    # Front propeller
-        [0, 1, 0],    # Right propeller
-        [-1, 0, 0],   # Rear propeller
-        [0, -1, 0],   # Left propeller
+        [0.5, 0, 0],    # Front propeller
+        [0, 0.5, 0],    # Right propeller
+        [-0.5, 0, 0],   # Rear propeller
+        [0, -0.5, 0],   # Left propeller
     ])
 
     contact_point_location = [solution.value(optimizer.robot_model.contact_point_location[k]) for k in range(optimizer.config.num_steps+1)]
@@ -79,6 +79,7 @@ def animate_solution(optimizer, solution):
         # Update contact line
         contact_line.set_data([pos_i[0], contact_point[0]], [pos_i[1], contact_point[1]])
         contact_line.set_3d_properties([pos_i[2], contact_point[2]])
+        contact_line.set_zorder(5)
 
         # Rotate and translate the drone body
         rotated_drone_body = (rotation @ drone_body.T).T + pos_i
@@ -91,6 +92,7 @@ def animate_solution(optimizer, solution):
         drone_arm1.set_3d_properties(
             [rotated_drone_body[0, 2], rotated_drone_body[2, 2]]
         )
+        drone_arm1.set_zorder(5)
 
         drone_arm2.set_data(
             [rotated_drone_body[1, 0], rotated_drone_body[3, 0]],
@@ -99,6 +101,7 @@ def animate_solution(optimizer, solution):
         drone_arm2.set_3d_properties(
             [rotated_drone_body[1, 2], rotated_drone_body[3, 2]]
         )
+        drone_arm2.set_zorder(5)
 
         return x_line, y_line, z_line, contact_line, drone_arm1, drone_arm2
 
