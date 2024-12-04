@@ -75,3 +75,14 @@ class MeshLoader(TerrainBase):
 
         normal = gradient / ca.norm_2(gradient)  # Normalize to unit vector
         return normal
+    
+    def plot_surface(self, ax):
+        """
+        Plot the mesh on the given MPL axes.
+        """
+        ax.plot_trisurf(
+            self.mesh.vertices[:, 0], 
+            self.mesh.vertices[:,1], 
+            triangles=self.mesh.faces, 
+            Z=self.mesh.vertices[:,2]
+        ) 
