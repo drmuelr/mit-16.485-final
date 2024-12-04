@@ -6,6 +6,7 @@ from traj_opt.models.terrain.hilly_preset import HillyTerrain
 from traj_opt.models.terrain.base import TerrainBase
 from traj_opt.models.terrain.mesh_loader import MeshLoader
 from traj_opt.models.softfly.model import Softfly
+from traj_opt.models.terrain.voxblox_sdf_loader import VoxbloxSdfLoader
 
 __all__ = [
     "HoppingSoftfly",
@@ -13,6 +14,7 @@ __all__ = [
     "InclinedPlaneTerrain",
     "HillyTerrain",
     "MeshLoader",
+    "VoxbloxSdfLoader",
     "RobotBase",
     "Softfly"
 ]

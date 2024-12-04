@@ -2,11 +2,11 @@ from typing import cast
 
 import casadi as ca
 import numpy as np
+from pathlib import Path
 
 from traj_opt.optimizer.plot import animate_solution
-
 from configs import TrajOptConfig
-from traj_opt.models import MeshLoader
+from traj_opt.models import MeshLoader, VoxbloxSdfLoader
 
 
 class Optimizer:
@@ -29,18 +29,8 @@ class Optimizer:
         # Setup the free time problem parameters
         self.setup_free_time()
 
-        # Initialize the terrain model
-        self.is_mesh_terrain = isinstance(config.terrain_source, str)
-        print(
-            "Initializing terrain from source: ", 
-              config.terrain_source if self.is_mesh_terrain
-              else config.terrain_source.__name__ + " (preset)"
-            )
-        self.terrain_model = (
-            MeshLoader(config.terrain_source) if self.is_mesh_terrain
-            else config.terrain_source() 
-        )
-        print("Finished initializing terrain!")
+        # Setup the terrain model
+        self.setup_terrain_model()
 
         # Initialize the robot model
         print("Initializing robot model: ", config.robot_class.__name__)
@@ -49,6 +39,34 @@ class Optimizer:
 
         # Load the initial guess
         self.load_initial_guess()
+
+    def setup_terrain_model(self):
+        """
+        Setup the terrain model based on the terrain source from the config:
+            1. If the terrain source is a path to a .obj mesh file, use the MeshLoader
+            2. If the terrain source is a path to a .npy file, use the VoxbloxSdfLoader
+            3. If the terrain source is a custom class, construct that class as the model
+        """
+        # Check if the terrain source is a custom class
+        self.terrain_type = (
+            "preset" if isinstance(self.config.terrain_source, type)
+            else "mesh" if Path(self.config.terrain_source).suffix == ".obj"
+            else "sdf"
+        )
+
+        print(
+            "Initializing terrain from source: ", 
+              self.config.terrain_source if not self.terrain_type == "preset"
+              else self.config.terrain_source.__name__ + " (preset)"
+            )
+        
+        self.terrain_model = (
+            MeshLoader(self.config.terrain_source) if self.terrain_type == "mesh"
+            else VoxbloxSdfLoader(self.config.terrain_source) if self.terrain_type == "sdf"
+            else self.config.terrain_source() 
+        )
+        print("Finished initializing terrain!")
+
 
     def setup_free_time(self):
         """
@@ -73,7 +91,7 @@ class Optimizer:
         # Solve the optimization problem
 
         plugin_opts = {
-            "expand": not self.is_mesh_terrain
+            "expand": self.terrain_type == "preset"
         }
         solver_options = {
             "tol": 1e-4,                # Set convergence tolerance

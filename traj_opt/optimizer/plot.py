@@ -47,7 +47,7 @@ def animate_solution(optimizer, solution):
     zmin = state_lims["position_Z"][0] - 2
     zmax = state_lims["position_Z"][1] + 2
     
-    if not optimizer.is_mesh_terrain: 
+    if optimizer.terrain_type == "preset": 
         x_surf = np.linspace(xmin, xmax, 100)
         y_surf = np.linspace(ymin, ymax, 100)
         X, Y = np.meshgrid(x_surf, y_surf)
@@ -57,7 +57,7 @@ def animate_solution(optimizer, solution):
         Z = plot_func_vectorized(X, Y)
         # Z = optimizer.terrain_model.plot_func(X, Y)
         ax.plot_surface(X, Y, Z, color="gray", alpha=1.0)
-    else:
+    elif optimizer.terrain_type == "mesh":
         mesh = optimizer.terrain_model.mesh
         ax.plot_trisurf(
             mesh.vertices[:, 0], 
@@ -65,6 +65,8 @@ def animate_solution(optimizer, solution):
             triangles=mesh.faces, 
             Z=mesh.vertices[:,2]
         ) 
+    elif optimizer.terrain_type == "sdf":
+        optimizer.terrain_model.plot_zero_crossing(ax)
 
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
