@@ -53,6 +53,14 @@ def plot_zero_crossing(data, threshold):
     ax.set_zlabel("Z")
     ax.set_title(f"Zero-Crossing Points (Threshold: {threshold})")
 
+    # Set the axis limits
+    ax.set_xlim([np.min(x), np.max(x)])
+    ax.set_ylim([np.min(y), np.max(y)])
+    ax.set_zlim([np.min(z), np.max(z)])
+
+    ax.set_proj_type('ortho')
+    ax.set_aspect('equal')
+
     # Show the plot
     plt.show()
 

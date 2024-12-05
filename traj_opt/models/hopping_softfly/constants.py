@@ -1,6 +1,6 @@
 import casadi as ca
 
-ORIGINAL_SPRING_LENGTH_M = 0.42
+ORIGINAL_SPRING_LENGTH_M = 0.5
 """
 The length of the spring when it is at rest [m].
 """

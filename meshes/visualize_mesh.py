@@ -38,8 +38,9 @@ if __name__ == "__main__":
         vertices[:, 0], vertices[:, 1], vertices[:, 2],
         triangles=faces,
         cmap='viridis',
-        edgecolor='none',
-        alpha=0.8
+        edgecolor='k',
+        linewidth=0.5,
+        alpha=0.5
     )
 
     # Set axis labels
@@ -47,8 +48,8 @@ if __name__ == "__main__":
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    # Set the aspect ratio
-    ax.set_box_aspect([1, 1, 1])
+    ax.set_proj_type('ortho')
+    ax.set_aspect('equal')
 
     plt.show()
 
