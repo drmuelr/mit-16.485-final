@@ -58,9 +58,9 @@ def animate_solution(optimizer, solution):
         # Z = optimizer.terrain_model.plot_func(X, Y)
         ax.plot_surface(X, Y, Z, color="gray", alpha=1.0)
     elif optimizer.terrain_type == "mesh":
-        optimizer.terrain_model.plot_surface()
+        optimizer.terrain_model.plot_surface(ax)
     elif optimizer.terrain_type == "sdf":
-        optimizer.terrain_model.plot_zero_crossing()
+        optimizer.terrain_model.plot_zero_crossing(ax)
 
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
